@@ -6,7 +6,7 @@
     public class Set
     {
         public ushort Size => (ushort)this.Data.Length;
-        public ushort[] Data { get; }
+        public ushort[] Data { get; private set; }
 
         private Set(ushort[] data) => this.Data = data;
 
@@ -35,7 +35,8 @@
         {
             var d = this.Data;
             System.Array.Resize(ref d, size);
-            return new(d);
+            this.Data = d;
+            return this;
         }
 
         /// <summary>
@@ -60,13 +61,11 @@
         public bool IsNotEqual(Set other)
         {
             var size = Math.Max(this.Size, other.Size);
-            var left = this;
-            var right = other;
-            if (left.Size < size)
-                left = left.Adjust(size);
-            else if (right.Size < size)
-                right = right.Adjust(size);
-            return !left.Data.Zip(right.Data, (a, b) => a == b).All(b => b);
+            if (this.Size < size)
+                this.Adjust(size);
+            else if (other.Size < size)
+                other.Adjust(size);
+            return !this.Data.Zip(other.Data, (a, b) => a == b).All(b => b);
         }
 
         /// <summary>
