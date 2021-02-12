@@ -2622,8 +2622,10 @@
                     break;
                 case StandardCall.CSP_USTAT:
                     {
-                        var dummy = Stack.Pop();
-                        var offset = Stack.PopInteger();
+                        //var dummy = 
+                            Stack.Pop();
+                        //var offset = 
+                            Stack.PopInteger();
                         var addr = Stack.Pop();
                         var unit = Stack.Pop();
                         VirtualMachine.UnitStat(unit, addr/*, offset, dummy*/);
