@@ -19,5 +19,10 @@
         {
             throw new NotImplementedException();
         }
+
+        public static ushort GetProcedureInstructionPointerBase(ushort jTab)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
