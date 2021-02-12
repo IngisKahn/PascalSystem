@@ -31,7 +31,7 @@
 
         private static readonly Slot[] mem = new Slot[0x10000];
 
-        private record EmulationTag(EmulateReader Read, EmulateWriter Write);
+        private record EmulationTag(EmulateReader Read, EmulateWriter? Write);
 
         private static readonly Dictionary<ushort, EmulationTag> emulators = new();
 
@@ -289,7 +289,7 @@
         private static void EmulateWrite(ushort address, ushort value)
         {
             if (Memory.emulators.TryGetValue(address, out var et))
-                et.Write(address, value);
+                et.Write?.Invoke(address, value);
         }
 
         public delegate ushort EmulateReader(ushort address);
@@ -297,7 +297,7 @@
         public delegate void EmulateWriter(ushort address, ushort value);
 
         [Conditional("MEM_EMULATE")]
-        public static void SetEmulateRange(ushort from, ushort to, EmulateReader reader, EmulateWriter writer)
+        public static void SetEmulateRange(ushort from, ushort to, EmulateReader reader, EmulateWriter? writer)
         {
             var et = new EmulationTag(reader, writer);
 
@@ -314,7 +314,7 @@
         }
 
         [Conditional("MEM_EMULATE")]
-        public static void SetEmulateWord(ushort address, EmulateReader reader, EmulateWriter writer) =>
+        public static void SetEmulateWord(ushort address, EmulateReader reader, EmulateWriter? writer) =>
 #if WORD_MEMORY
             Memory.SetEmulateRange(address, address, reader, writer);
 #else
