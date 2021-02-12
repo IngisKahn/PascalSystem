@@ -10,6 +10,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PascalSystem.Model", "PascalSystem.Model\PascalSystem.Model.csproj", "{E93E41B9-5DDA-42D9-A272-CBC7158111AA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,6 +22,10 @@ Global
 		{E4D6BC69-DAAE-4CF0-940A-4B146AD22328}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E4D6BC69-DAAE-4CF0-940A-4B146AD22328}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E4D6BC69-DAAE-4CF0-940A-4B146AD22328}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E93E41B9-5DDA-42D9-A272-CBC7158111AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E93E41B9-5DDA-42D9-A272-CBC7158111AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E93E41B9-5DDA-42D9-A272-CBC7158111AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E93E41B9-5DDA-42D9-A272-CBC7158111AA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
