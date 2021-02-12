@@ -10,5 +10,10 @@
         {
             throw new NotImplementedException();
         }
+
+        public static ushort Boolean(bool p0)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
