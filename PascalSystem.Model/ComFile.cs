@@ -3,7 +3,6 @@
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Linq;
     using System.Text;
 
     public class ComFile
@@ -67,30 +66,6 @@
                     stream.Write(fileData, 0, fileData.Length);
             foreach (var unit in this.UnitMap.Values)
                 unit.Dump(outputFolder);
-        }
-    }
-
-    public class Unit
-    {
-        private string name;
-        private byte number;
-        private ComFile comFile;
-        private int v;
-
-        public Unit(string name, byte number, ComFile comFile, int v)
-        {
-            this.name = name;
-            this.number = number;
-            this.comFile = comFile;
-            this.v = v;
-        }
-
-        public void Initialize(byte[] systemData)
-        {
-        }
-
-        public void Dump(string outputFolder)
-        {
         }
     }
 }
