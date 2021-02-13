@@ -1,5 +1,6 @@
 ﻿// ReSharper disable InconsistentNaming
 // ReSharper disable IdentifierTypo
+// ReSharper disable CommentTypo
 namespace PascalSystem.Model
 {
     public enum OpcodeValue : byte
@@ -875,7 +876,7 @@ namespace PascalSystem.Model
         RNP = 173,
 
         /// <summary>
-        ///     Call Intermeduiate Procedure
+        ///     Call Intermediate Procedure
         /// </summary>
         CIP = 174,
 

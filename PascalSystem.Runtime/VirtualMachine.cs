@@ -538,8 +538,7 @@
             {
                 Console.Error.Write(prompt);
                 var line = Console.ReadLine();
-                if (line ==
-                    "")
+                if (string.IsNullOrEmpty(line))
                     break;
 
                 //IDisposable closeMethod = null;

@@ -7,7 +7,7 @@
     {
         public bool Equals(BitCount other) => this.value == other.value;
 
-        public override bool Equals(object obj) => obj is BitCount b && this.Equals(b);
+        public override bool Equals(object? obj) => obj is BitCount b && this.Equals(b);
 
         public override int GetHashCode() => this.value;
 
@@ -49,7 +49,7 @@
 
         public string ToString(IFormatProvider formatProvider) => this.value.ToString(formatProvider);
 
-        public string ToString(string format, IFormatProvider formatProvider) => this.value.ToString(format,
+        public string ToString(string? format, IFormatProvider? formatProvider) => this.value.ToString(format,
             formatProvider);
     }
 }

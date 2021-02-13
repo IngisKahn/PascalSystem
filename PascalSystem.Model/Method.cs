@@ -74,5 +74,10 @@
             writer.Indent--;
             writer.Indent -= this.lexLevel;
         }
+        public int AddOpCode(OpCode opCode)
+        {
+            this.OpCodes.Add(opCode);
+            return opCode.Length;
+        }
     }
 }

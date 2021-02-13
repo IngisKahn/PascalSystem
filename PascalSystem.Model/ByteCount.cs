@@ -20,7 +20,7 @@
 
         public bool Equals(ByteCount other) => this.value == other.value;
 
-        public override bool Equals(object obj) => obj is ByteCount b && this.Equals(b);
+        public override bool Equals(object? obj) => obj is ByteCount b && this.Equals(b);
 
         public override int GetHashCode() => this.value;
 
@@ -42,7 +42,7 @@
 
         public override string ToString() => this.value.ToString(CultureInfo.InvariantCulture);
 
-        public string ToString(string format, IFormatProvider formatProvider) => this.value.ToString(format,
+        public string ToString(string? format, IFormatProvider? formatProvider) => this.value.ToString(format,
             formatProvider);
 
         public string ToString(IFormatProvider formatProvider) => this.value.ToString(formatProvider);
