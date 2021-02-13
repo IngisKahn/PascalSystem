@@ -38,7 +38,7 @@
             var p = this.position;
             var procCount = systemData[p - 1];
             p -= 2;
-            Method lastMethod = null;
+            Method? lastMethod = null;
             for (var procId = 1; procId <= procCount; procId++)
             {
                 p -= 2;
@@ -47,31 +47,6 @@
                 lastMethod = method;
                 this.Methods.Add(method.Id, method);
             }
-        }
-    }
-
-    public class Method
-    {
-        private byte[] systemData;
-        private int jTab;
-        private int procId;
-        private Unit unit;
-        private Method lastMethod;
-
-        public Method(byte[] systemData, int jTab, int procId, Unit unit, Method lastMethod)
-        {
-            this.systemData = systemData;
-            this.jTab = jTab;
-            this.procId = procId;
-            this.unit = unit;
-            this.lastMethod = lastMethod;
-        }
-
-        public int Id { get; set; }
-
-        public void Dump(IndentedTextWriter writer)
-        {
-            throw new NotImplementedException();
         }
     }
 }
