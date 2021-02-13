@@ -75,19 +75,4 @@
             writer.Indent -= this.lexLevel;
         }
     }
-
-    public class OpCode
-    {
-        public static int Read(Method method, byte[] systemData, int totalLength, int jumpTable, int position, int i)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Dump(IndentedTextWriter writer)
-        {
-            throw new NotImplementedException();
-        }
-
-        public int Length { get; set; }
-    }
 }
