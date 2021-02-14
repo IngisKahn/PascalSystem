@@ -14,7 +14,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PascalSystem.Model", "Pasca
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PascalSystem.Decompilation", "PascalSystem.Decompilation\PascalSystem.Decompilation.csproj", "{57F21456-A3DF-4E96-A260-D49E9881D722}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PascalSystem.Decompilation.Tests", "PascalSystem.Decompilation.Tests\PascalSystem.Decompilation.Tests.csproj", "{615C3F17-D25F-47C8-82EA-60B9D2A5C9D7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PascalSystem.Console", "PascalSystem.Console\PascalSystem.Console.csproj", "{C97941CE-F487-4272-A1B0-33A42AC7EACD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -34,10 +34,10 @@ Global
 		{57F21456-A3DF-4E96-A260-D49E9881D722}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{57F21456-A3DF-4E96-A260-D49E9881D722}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{57F21456-A3DF-4E96-A260-D49E9881D722}.Release|Any CPU.Build.0 = Release|Any CPU
-		{615C3F17-D25F-47C8-82EA-60B9D2A5C9D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{615C3F17-D25F-47C8-82EA-60B9D2A5C9D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{615C3F17-D25F-47C8-82EA-60B9D2A5C9D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{615C3F17-D25F-47C8-82EA-60B9D2A5C9D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C97941CE-F487-4272-A1B0-33A42AC7EACD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C97941CE-F487-4272-A1B0-33A42AC7EACD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C97941CE-F487-4272-A1B0-33A42AC7EACD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C97941CE-F487-4272-A1B0-33A42AC7EACD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
