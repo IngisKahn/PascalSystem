@@ -4,15 +4,17 @@
 
     public abstract partial class Expression
     {
-        protected abstract string ToString(StringBuilder builder);
+        protected abstract void BuildString(StringBuilder builder);
 
-        public override string ToString() => this.ToString(new());
+        public override string ToString()
+        {
+            StringBuilder builder = new();
+            this.BuildString(builder);
+            builder.Append(" : ");
+            builder.Append(this.Type);
+            return builder.ToString();
+        }
 
         public abstract Types.Base Type { get; }
-    }
-
-    public abstract class Statement : Expression
-    {
-        public override Types.Base Type => Types.Void.Instance;
     }
 }

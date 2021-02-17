@@ -4,7 +4,7 @@
     {
         public class ConstantWord : Constant
         {
-            public ConstantWord(int value) : base((int)OpcodeValue.LDCI) => this.Value = value;
+            public ConstantWord(int value) : base(OpcodeValue.LDCI) => this.Value = value;
             public int Value { get; }
 
             public override int Length => 3;

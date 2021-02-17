@@ -1,12 +1,30 @@
 ﻿namespace PascalSystem.Decompilation.Types
 {
+    using Model;
+
     public abstract class Base
     {
 
     }
 
     public class Pointer : Base { }
-    public class Size : Base { }
+
+    public class SizeRange : Base
+    {
+        public BitCount Minimum { get; }
+        public BitCount Maximum { get; }
+
+        public SizeRange(BitCount minimum, BitCount maximum)
+        {
+            this.Minimum = minimum;
+            this.Maximum = maximum;
+        }
+    }
+
+    public class Size : SizeRange
+    {
+        public Size(BitCount bits) : base(bits, bits) { }
+    }
 
     public class Void : Base
     {

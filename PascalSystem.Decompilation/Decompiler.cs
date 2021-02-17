@@ -2,13 +2,15 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
+    using System.Threading.Tasks;
     using Model;
 
     public class Decompiler
     {
         private readonly  (Unit? Unit, MethodAnalyzer[]? MethodAnalyzers)[] unitMethods;
-
+        
         public MethodAnalyzer GetMethod(int unitId, int methodId)
         {
             if (unitId < 0 || unitId >= this.unitMethods.Length)
@@ -31,11 +33,40 @@
             this.unitMethods = new (Unit? Unit, MethodAnalyzer[]? MethodAnalyzers)[maxId];
             foreach (var unit in source)
                 this.unitMethods[unit.Number - 1] = (unit, unit.Methods.Values.OrderBy(m => m.Id)
-                                                                          .Select(m => new MethodAnalyzer(m))
+                                                                          .Select(m => new MethodAnalyzer(this, m))
                                                                           .ToArray());
         }
 
         public void ProcessUnits()
+        {
+            this.unitMethods[0].MethodAnalyzers?[0].Decompile();
+        }
+
+        public async Task Dump(string path)
+        {
+            foreach (var (unit, methodAnalyzers) in this.unitMethods)
+            {
+                if (unit == null || methodAnalyzers == null)
+                    continue;
+                await using FileStream stream = new(Path.Join(path, unit.Name + ".pas"), FileMode.Create);
+                await using StreamWriter writer = new(stream);
+
+                var isProgram = unit.Number == 1;
+
+                await writer.WriteLineAsync((isProgram ? "PROGRAM " : "UNIT ") + unit.Name + ';');
+                await writer.WriteLineAsync();
+            }
+        }
+    }
+
+    public class MethodSignature
+    {
+        public MethodSignature(Model.Method method)
+        {
+
+        }
+
+        public MethodSignature(string name, Types.Base[] parameters)
         {
 
         }

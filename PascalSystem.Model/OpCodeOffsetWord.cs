@@ -4,7 +4,7 @@
     {
         public abstract class OffsetWord : OpCode
         {
-            protected OffsetWord(int code, int offset)
+            protected OffsetWord(OpcodeValue code, int offset)
                 : base(code) => this.Offset = offset;
 
             public int Offset { get; }

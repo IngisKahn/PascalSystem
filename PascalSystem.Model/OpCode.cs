@@ -8,8 +8,8 @@
 
     public partial class OpCode
     {
-        public OpCode(int code) => this.Id = code;
-        public int Id { get; }
+        public OpCode(OpcodeValue code) => this.Id = code;
+        public OpcodeValue Id { get; }
 
         public virtual int Length => 1;
 
@@ -17,9 +17,9 @@
 
         internal static int Read(Method method, byte[] systemData, int position, int jTab, int procBase, int ipc)
         {
-            var code = systemData[position++];
+            var code = (OpcodeValue)systemData[position++];
 
-            switch ((OpcodeValue)code)
+            switch (code)
             {
                 case OpcodeValue.LDCI:
                     return method.AddOpCode(new ConstantWord(BitConverter.ToUInt16(systemData, position)));
@@ -93,7 +93,7 @@
                                   - (BitConverter.ToUInt16(systemData, jTab + address) - address);
                     else
                         address += ipc + 2;
-                    return method.AddOpCode(new Jump(code, isInTable, address, code != (int)OpcodeValue.UJP));
+                    return method.AddOpCode(new Jump(code, isInTable, address, code != OpcodeValue.UJP));
                 }
                 case OpcodeValue.XJP:
                 {
@@ -136,7 +136,7 @@
                     return method.AddOpCode(new Exit(code, false));
             }
 
-            return method.AddOpCode(new OpCode(code));
+            return method.AddOpCode(new(code));
         }
 
         private static int ReadBig(byte[] data, int position)

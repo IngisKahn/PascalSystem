@@ -4,7 +4,7 @@
     {
         public class Type : OpCode
         {
-            public Type(int code, int type) : base(code) => this.TypeCode = type;
+            public Type(OpcodeValue code, int type) : base(code) => this.TypeCode = type;
             public int TypeCode { get; }
 
             public string TypeName

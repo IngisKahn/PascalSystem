@@ -4,7 +4,7 @@
     {
         public class ConstantString : Constant
         {
-            public ConstantString(string value) : base((int)OpcodeValue.LSA) => this.Value = value;
+            public ConstantString(string value) : base(OpcodeValue.LSA) => this.Value = value;
             public string Value { get; }
 
             public override int Length => 2 + this.Value.Length;

@@ -4,7 +4,7 @@
     {
         public class Exit : OpCode
         {
-            public Exit(int code, bool isNormal = true)
+            public Exit(OpcodeValue code, bool isNormal = true)
                 : base(code) => this.IsNormal = isNormal;
 
             public bool IsNormal { get; }

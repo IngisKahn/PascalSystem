@@ -7,7 +7,7 @@
     {
         public class ConstantWordList : Constant
         {
-            public ConstantWordList(int[] value) : base((int)OpcodeValue.LDC) => this.Value = value;
+            public ConstantWordList(int[] value) : base(OpcodeValue.LDC) => this.Value = value;
             public int[] Value { get; }
 
             public override int Length => 2 + this.Value.Length * 2;

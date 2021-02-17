@@ -1035,7 +1035,7 @@
                     Stack.Push((ushort)(opcode - OpcodeValue.SLDC_0));
                     break;
                 case OpcodeValue.LDCN: // Load Constant Nil
-                    // push the vallue of NIL
+                    // push the value of NIL
                     Stack.Push(0);
                     break;
                 case OpcodeValue.LDCI: // Load Constant Integer
@@ -1658,7 +1658,7 @@
                             throw new ExecutionException(ExecutionErrorCode.UnimplementedInstruction);
                     }
                     break;
-                // TOS arithmaetic: logical
+                // TOS arithmetic: logical
                 case OpcodeValue.LAND: // Logical And
                     Stack.Push((ushort)(Stack.Pop() & Stack.Pop()));
                     break;
