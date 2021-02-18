@@ -6,6 +6,7 @@
     using System.Linq;
     using System.Threading.Tasks;
     using Model;
+    using Types;
 
     public class Decompiler
     {
@@ -61,14 +62,30 @@
 
     public class MethodSignature
     {
+        public Interval Parameters { get; }
+        public Base ReturnType { get; }
+        public string Name { get; }
         public MethodSignature(Model.Method method)
         {
+            this.ReturnType = method.ReturnLength == 0 ? Types.Void.Instance : new SizeRange((BitCount)1, (BitCount)16).Proxy();
 
+            this.Parameters = new(method.ParameterLength);
+
+            this.Name = method.Unit.Name + "." + method.Name;
         }
 
         public MethodSignature(string name, Types.Base[] parameters)
         {
+            this.Name = name;
 
+            if (parameters.Length == 0)
+                throw new ArgumentException("Method must have at least 1 return parameter");
+
+            this.ReturnType = parameters[0];
+
+            this.Parameters = new((WordCount)(parameters.Length - 1));
+            for (var i = 1; i < parameters.Length; i++)
+                this.Parameters.MeetAt((WordCount)(i - 1), parameters[i]);
         }
     }
 }

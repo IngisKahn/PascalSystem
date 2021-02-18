@@ -77,6 +77,8 @@
         public int AddOpCode(OpCode opCode)
         {
             this.OpCodes.Add(opCode);
+            if (opCode is OpCode.ExitByte x)
+                this.ReturnLength = x.Count;
             return opCode.Length;
         }
     }

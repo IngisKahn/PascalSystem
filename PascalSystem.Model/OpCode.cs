@@ -129,9 +129,9 @@
                 case OpcodeValue.CSP:
                     return method.AddOpCode(new CallStandardProcedure(systemData[position]));
                 case OpcodeValue.RNP:
-                    return method.AddOpCode(new ExitByte(systemData[position]));
                 case OpcodeValue.RBP:
-                    return method.AddOpCode(new Exit(code));
+                    return method.AddOpCode(new ExitByte(systemData[position]));
+                    //return method.AddOpCode(new Exit(code));
                 case OpcodeValue.XIT:
                     return method.AddOpCode(new Exit(code, false));
             }

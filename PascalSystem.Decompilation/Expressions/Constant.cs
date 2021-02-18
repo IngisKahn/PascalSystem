@@ -2,10 +2,11 @@
 {
     using System.Text;
     using Model;
+    using Types;
 
     public class Constant : Expression
     {
-        public Constant(object value, Types.Base type)
+        public Constant(object? value, Types.Base type)
         {
             this.Type = type;
             this.Value = value;
@@ -20,7 +21,7 @@
             this.Value = value;
         }
 
-        public object Value { get; }
+        public object? Value { get; }
         public override Types.Base Type { get; }
         protected override void BuildString(StringBuilder builder) => builder.Append(this.Value);
     }
@@ -28,5 +29,6 @@
     public partial class Expression
     {
         public static Constant Constant(int value) => new(value);
+        public static Constant Constant<T>(object? value) where T : Base, new() => new(value, new T());
     }
 }
