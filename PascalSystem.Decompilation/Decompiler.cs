@@ -65,18 +65,21 @@
         public Interval Parameters { get; }
         public Base ReturnType { get; }
         public string Name { get; }
+        public string FullName { get; }
         public MethodSignature(Model.Method method)
         {
             this.ReturnType = method.ReturnLength == 0 ? Types.Void.Instance : new SizeRange((BitCount)1, (BitCount)16).Proxy();
 
             this.Parameters = new(method.ParameterLength);
 
-            this.Name = method.Unit.Name + "." + method.Name;
+            this.Name = method.Name;
+            this.FullName = method.Unit.Name + "." + method.Name;
         }
 
         public MethodSignature(string name, Types.Base[] parameters)
         {
             this.Name = name;
+            this.FullName = "PASCALSYSTEM." + name;
 
             if (parameters.Length == 0)
                 throw new ArgumentException("Method must have at least 1 return parameter");

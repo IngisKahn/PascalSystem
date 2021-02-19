@@ -20,6 +20,12 @@
             this.baseType = type;
         }
 
+        public Array()
+        {
+            this.Length = Array.NoBound;
+            this.baseType = Void.Instance;
+        }
+
         public Base BaseType
         {
             get => this.baseType;

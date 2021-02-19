@@ -95,7 +95,7 @@
         {
             if (this.slots.Count == 0)
                 return null;
-            var slot = new RangeSlot(offset, null);
+            var slot = new RangeSlot(offset, Void.Instance);
             var pos = this.slots.BinarySearch(slot, Interval.slotComparer);
 
             return pos < 0 ? null : this.slots[pos].Type;

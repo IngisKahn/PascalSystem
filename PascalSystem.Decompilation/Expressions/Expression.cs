@@ -1,10 +1,12 @@
 ﻿namespace PascalSystem.Decompilation.Expressions
 {
+    using System.Linq;
+    using System.Reflection;
     using System.Text;
 
     public abstract partial class Expression
     {
-        protected abstract void BuildString(StringBuilder builder);
+        internal abstract void BuildString(StringBuilder builder);
 
         public override string ToString()
         {

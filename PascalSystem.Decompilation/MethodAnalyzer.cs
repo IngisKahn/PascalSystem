@@ -11,7 +11,7 @@
     public class MethodAnalyzer : IEnumerable<BasicBlock>
     {
         private readonly Model.Method method;
-        private readonly MethodSignature signature;
+        public MethodSignature Signature { get; }
         private readonly Decompiler decompiler;
         private bool decompiled;
         private Dictionary<int, int> opAddressToIndex = new();
@@ -20,7 +20,8 @@
         {
             this.decompiler = decompiler;
             this.method = method;
-            this.signature = new(method);
+            this.Signature = new(method);
+            this.Locals = new Interval(method.DataLength);
         }
 
         public IEnumerator<BasicBlock> GetEnumerator() => throw new NotImplementedException();
@@ -29,7 +30,9 @@
 
         private readonly List<BasicBlock> blockList = new();
 
-        public List<Statement> Statements { get; } = new();
+        public Interval Locals { get; }
+
+        public List<Expression> Statements { get; } = new();
 
         private record DecompilerState(BasicBlock CurrentBlock, Stack<Expressions.Expression> VmStack);
 
@@ -65,7 +68,7 @@
         {
             if (opCode.Id <= OpcodeValue.SLDC_127) // One word Load and Stores constant
             {
-                state.VmStack.Push(Expressions.Expression.Constant((int)opCode.Id));
+                state.VmStack.Push(Expression.Constant((int)opCode.Id));
                 return;
             }
 
@@ -123,7 +126,7 @@
         {
             offset -= (WordCount)1;
             if ((int)offset < (int)this.method.ParameterLength)
-                return Expression.Parameter(offset /*+ (WordCount)method.ParentParameterOffset*/, this.signature.Parameters.MeetAt(offset, type));
+                return Expression.Parameter(offset /*+ (WordCount)method.ParentParameterOffset*/, this.Signature.Parameters.MeetAt(offset, type));
             offset -= method.ParameterLength; // -method.ParametersSize + (WordCount)method.ParentLocalOffset
             return Expression.Local(offset, this.Locals.MeetAt(offset, type));
         }
