@@ -1,12 +1,12 @@
 ﻿namespace PascalSystem.Decompilation
 {
     using System;
+    using System.CodeDom.Compiler;
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
     using System.Threading.Tasks;
     using Model;
-    using Types;
 
     public class Decompiler
     {
@@ -51,44 +51,18 @@
                     continue;
                 await using FileStream stream = new(Path.Join(path, unit.Name + ".pas"), FileMode.Create);
                 await using StreamWriter writer = new(stream);
-
+                IndentedTextWriter w = new(writer);
                 var isProgram = unit.Number == 1;
-
-                await writer.WriteLineAsync((isProgram ? "PROGRAM " : "UNIT ") + unit.Name + ';');
-                await writer.WriteLineAsync();
+                await w.WriteLineAsync((isProgram ? "PROGRAM " : "UNIT ") + unit.Name + ';');
+                // write vars
+                // write lvl 1s
+                foreach (var methodAnalyzer in methodAnalyzers.Where(m => m.Level == 1))
+                    await methodAnalyzer.Dump(w);
+                // write lvl 0
+                if (!isProgram)
+                    continue;
+                await methodAnalyzers[0].DumpCode(w);
             }
-        }
-    }
-
-    public class MethodSignature
-    {
-        public Interval Parameters { get; }
-        public Base ReturnType { get; }
-        public string Name { get; }
-        public string FullName { get; }
-        public MethodSignature(Model.Method method)
-        {
-            this.ReturnType = method.ReturnLength == 0 ? Types.Void.Instance : new SizeRange((BitCount)1, (BitCount)16).Proxy();
-
-            this.Parameters = new(method.ParameterLength);
-
-            this.Name = method.Name;
-            this.FullName = method.Unit.Name + "." + method.Name;
-        }
-
-        public MethodSignature(string name, Types.Base[] parameters)
-        {
-            this.Name = name;
-            this.FullName = "PASCALSYSTEM." + name;
-
-            if (parameters.Length == 0)
-                throw new ArgumentException("Method must have at least 1 return parameter");
-
-            this.ReturnType = parameters[0];
-
-            this.Parameters = new((WordCount)(parameters.Length - 1));
-            for (var i = 1; i < parameters.Length; i++)
-                this.Parameters.MeetAt((WordCount)(i - 1), parameters[i]);
         }
     }
 }

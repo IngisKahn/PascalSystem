@@ -4,7 +4,7 @@
     {
         public class IntermediateWord : OffsetWord
         {
-            public IntermediateWord(OpcodeValue code, int level, int offset) : base(code, offset) => this.Level = level;
+            public IntermediateWord(OpCodeValue code, int level, int offset) : base(code, offset) => this.Level = level;
             public int Level { get; }
 
             public override int Length => base.Length + 1;

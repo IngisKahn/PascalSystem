@@ -5,7 +5,7 @@
         public class ExternalCall : OpCode
         {
             public ExternalCall(string segment, int segNum, int proc)
-                : base(OpcodeValue.CXP)
+                : base(OpCodeValue.CXP)
             {
                 this.Segment = segment;
                 this.SegNumber = segNum;

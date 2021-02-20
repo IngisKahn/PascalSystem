@@ -4,7 +4,7 @@
     {
         public abstract class Constant : OpCode
         {
-            protected Constant(OpcodeValue code) : base(code) { }
+            protected Constant(OpCodeValue code) : base(code) { }
         }
     }
 }

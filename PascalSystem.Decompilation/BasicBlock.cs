@@ -1,5 +1,8 @@
 ﻿namespace PascalSystem.Decompilation
 {
+    using System.CodeDom.Compiler;
+    using System.Threading.Tasks;
+
     public class BasicBlock
     {
         private readonly MethodAnalyzer methodAnalyzer;

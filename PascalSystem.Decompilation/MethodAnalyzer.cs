@@ -1,8 +1,11 @@
 ﻿namespace PascalSystem.Decompilation
 {
     using System;
+    using System.CodeDom.Compiler;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Linq;
+    using System.Threading.Tasks;
     using Expressions;
     using Model;
     using Types;
@@ -15,13 +18,17 @@
         private readonly Decompiler decompiler;
         private bool decompiled;
         private Dictionary<int, int> opAddressToIndex = new();
+        public int ParentId { get; set; } = -1;
+        public HashSet<int> ChildIds { get; } = new();
+        public bool IsFunction => this.Signature.IsFunction;
 
         public MethodAnalyzer(Decompiler decompiler, Model.Method method)
         {
             this.decompiler = decompiler;
             this.method = method;
             this.Signature = new(method);
-            this.Locals = new Interval(method.DataLength);
+            this.Locals = new(method.DataLength);
+            this.Level = method.Level;
         }
 
         public IEnumerator<BasicBlock> GetEnumerator() => throw new NotImplementedException();
@@ -33,6 +40,7 @@
         public Interval Locals { get; }
 
         public List<Expression> Statements { get; } = new();
+        public int Level { get; }
 
         private record DecompilerState(BasicBlock CurrentBlock, Stack<Expressions.Expression> VmStack);
 
@@ -66,7 +74,7 @@
 
         private void Decompile(OpCode opCode, int index, DecompilerState state)
         {
-            if (opCode.Id <= OpcodeValue.SLDC_127) // One word Load and Stores constant
+            if (opCode.Id <= OpCodeValue.SLDC_127) // One word Load and Stores constant
             {
                 state.VmStack.Push(Expression.Constant((int)opCode.Id));
                 return;
@@ -75,43 +83,43 @@
             WordCount offset;
             switch (opCode.Id)
             {
-                case OpcodeValue.NOP:
+                case OpCodeValue.NOP:
                     break;
-                case OpcodeValue.LDCN: // Load Constant Nil
+                case OpCodeValue.LDCN: // Load Constant Nil
                     state.VmStack.Push(Expression.Constant<Pointer>(null));
                     break;
-                case OpcodeValue.LDCI: // Load Constant Integer
+                case OpCodeValue.LDCI: // Load Constant Integer
                     state.VmStack.Push(Expression.Constant<Integer>(((OpCode.ConstantWord)opCode).Value));
                     break;// One-word load and stores local
                 // SLDL Short LoaD Local 1..16 
-                case OpcodeValue.SLDL_1:
-                case OpcodeValue.SLDL_2:
-                case OpcodeValue.SLDL_3:
-                case OpcodeValue.SLDL_4:
-                case OpcodeValue.SLDL_5:
-                case OpcodeValue.SLDL_6:
-                case OpcodeValue.SLDL_7:
-                case OpcodeValue.SLDL_8:
-                case OpcodeValue.SLDL_9:
-                case OpcodeValue.SLDL_10:
-                case OpcodeValue.SLDL_11:
-                case OpcodeValue.SLDL_12:
-                case OpcodeValue.SLDL_13:
-                case OpcodeValue.SLDL_14:
-                case OpcodeValue.SLDL_15:
-                case OpcodeValue.SLDL_16:
-                case OpcodeValue.LDL: //Load  Local
-                    offset = (WordCount)(opCode.Id == OpcodeValue.LDL
+                case OpCodeValue.SLDL_1:
+                case OpCodeValue.SLDL_2:
+                case OpCodeValue.SLDL_3:
+                case OpCodeValue.SLDL_4:
+                case OpCodeValue.SLDL_5:
+                case OpCodeValue.SLDL_6:
+                case OpCodeValue.SLDL_7:
+                case OpCodeValue.SLDL_8:
+                case OpCodeValue.SLDL_9:
+                case OpCodeValue.SLDL_10:
+                case OpCodeValue.SLDL_11:
+                case OpCodeValue.SLDL_12:
+                case OpCodeValue.SLDL_13:
+                case OpCodeValue.SLDL_14:
+                case OpCodeValue.SLDL_15:
+                case OpCodeValue.SLDL_16:
+                case OpCodeValue.LDL: //Load  Local
+                    offset = (WordCount)(opCode.Id == OpCodeValue.LDL
                         ? ((OpCode.LocalWord)opCode).Offset
-                        : opCode.Id - OpcodeValue.SLDL_1 + 1);
+                        : opCode.Id - OpCodeValue.SLDL_1 + 1);
                     state.VmStack.Push(this.LocalVariable(new Types.SizeRange((BitCount)1, (BitCount)16), offset));
                     break;
-                case OpcodeValue.LLA: // Load Local Address
+                case OpCodeValue.LLA: // Load Local Address
                     offset = (WordCount)((OpCode.LocalWord)opCode).Offset;
                     state.VmStack.Push(Expression.AddressOf(
                         this.LocalVariable(Void.Instance, offset)));
                     break;
-                case OpcodeValue.STL: // Store Local
+                case OpCodeValue.STL: // Store Local
                     offset = (WordCount)((OpCode.LocalWord)opCode).Offset;
                     this.Statements.Add(Expression.Assign(
                         this.LocalVariable(new SizeRange((BitCount)1, (BitCount)16), offset), state.VmStack.Pop()));
@@ -129,6 +137,23 @@
                 return Expression.Parameter(offset /*+ (WordCount)method.ParentParameterOffset*/, this.Signature.Parameters.MeetAt(offset, type));
             offset -= method.ParameterLength; // -method.ParametersSize + (WordCount)method.ParentLocalOffset
             return Expression.Local(offset, this.Locals.MeetAt(offset, type));
+        }
+
+        public async Task Dump(IndentedTextWriter writer)
+        {
+            await this.Signature.Dump(writer);
+            await this.DumpCode(writer);
+        }
+
+        public async Task DumpCode(IndentedTextWriter writer)
+        {
+            await writer.WriteLineAsync("BEGIN");
+            writer.Indent++;
+            foreach (var statement in this.Statements.Cast<Statement>())
+                await statement.Dump(writer);
+            writer.Indent--;
+            await writer.WriteLineAsync("END; {" + this.Signature.Name + "}");
+            await writer.WriteLineAsync();
         }
     }
 }

@@ -4,7 +4,7 @@
     {
         public class CountByte : OpCode
         {
-            public CountByte(OpcodeValue code, int count) : base(code) => this.Count = count;
+            public CountByte(OpCodeValue code, int count) : base(code) => this.Count = count;
             public int Count { get; }
 
             public override int Length => 2;

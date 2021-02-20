@@ -5,7 +5,7 @@
         public class IndexPacked : OpCode
         {
             public IndexPacked(int count, int stride)
-                : base(OpcodeValue.IXP)
+                : base(OpCodeValue.IXP)
             {
                 this.Count = count;
                 this.Stride = stride;

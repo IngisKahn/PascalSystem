@@ -4,7 +4,7 @@
     {
         public class LocalWord : OffsetWord
         {
-            public LocalWord(OpcodeValue code, int offset) : base(code, offset) { }
+            public LocalWord(OpCodeValue code, int offset) : base(code, offset) { }
 
             public override string ToString() => base.ToString() + " Local" + this.Offset.ToString("X");
         }

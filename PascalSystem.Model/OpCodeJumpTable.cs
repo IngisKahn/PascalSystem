@@ -11,7 +11,7 @@
             private readonly bool isPadded;
 
             public JumpTable(int minimum, int[] addresses, int defaultAddress, bool isPadded)
-                : base(OpcodeValue.XJP)
+                : base(OpCodeValue.XJP)
             {
                 this.isPadded = isPadded;
                 this.Minimum = minimum;

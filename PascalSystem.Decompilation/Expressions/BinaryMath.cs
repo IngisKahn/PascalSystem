@@ -5,10 +5,10 @@
 
     public class BinaryMath : Binary
     {
-        public BinaryMath(OpcodeValue ocv, Expression left, Expression right) : base(left, right) => this
+        public BinaryMath(OpCodeValue ocv, Expression left, Expression right) : base(left, right) => this
             .Operation = ocv;
 
-        public OpcodeValue Operation { get; }
+        public OpCodeValue Operation { get; }
 
         internal override void BuildString(StringBuilder builder)
         {
@@ -20,29 +20,29 @@
                 builder.Append(')');
             switch (this.Operation)
             {
-                case OpcodeValue.ADI:
-                case OpcodeValue.ADR:
+                case OpCodeValue.ADI:
+                case OpCodeValue.ADR:
                     builder.Append(" + ");
                     break;
-                case OpcodeValue.SBI:
-                case OpcodeValue.SBR:
+                case OpCodeValue.SBI:
+                case OpCodeValue.SBR:
                     builder.Append(" - ");
                     break;
-                case OpcodeValue.MPI:
-                case OpcodeValue.MPR:
+                case OpCodeValue.MPI:
+                case OpCodeValue.MPR:
                     builder.Append(" * ");
                     break;
-                case OpcodeValue.DVI:
-                case OpcodeValue.DVR:
+                case OpCodeValue.DVI:
+                case OpCodeValue.DVR:
                     builder.Append(" / ");
                     break;
-                case OpcodeValue.MODI:
+                case OpCodeValue.MODI:
                     builder.Append(" % ");
                     break;
-                case OpcodeValue.LAND:
+                case OpCodeValue.LAND:
                     builder.Append(" & ");
                     break;
-                case OpcodeValue.LOR:
+                case OpCodeValue.LOR:
                     builder.Append(" | ");
                     break;
                 default:
@@ -59,7 +59,7 @@
 
     public partial class Expression
     {
-        public static BinaryMath BinaryMath(OpcodeValue opCodeValue, Expression left, Expression right) =>
+        public static BinaryMath BinaryMath(OpCodeValue opCodeValue, Expression left, Expression right) =>
             new(opCodeValue, left, right);
     }
 }

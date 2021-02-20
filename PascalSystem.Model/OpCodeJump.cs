@@ -4,7 +4,7 @@
     {
         public class Jump : OpCode
         {
-            public Jump(OpcodeValue code, bool isInTable, int address, bool isConditional)
+            public Jump(OpCodeValue code, bool isInTable, int address, bool isConditional)
                 : base(code)
             {
                 this.Address = address;

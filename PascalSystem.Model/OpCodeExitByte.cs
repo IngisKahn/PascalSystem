@@ -5,7 +5,7 @@
         public class ExitByte : CountByte
         {
             public ExitByte(int count)
-                : base(OpcodeValue.RNP, count) { }
+                : base(OpCodeValue.RNP, count) { }
         }
     }
 }

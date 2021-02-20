@@ -8,8 +8,8 @@
 
     public partial class OpCode
     {
-        public OpCode(OpcodeValue code) => this.Id = code;
-        public OpcodeValue Id { get; }
+        public OpCode(OpCodeValue code) => this.Id = code;
+        public OpCodeValue Id { get; }
 
         public virtual int Length => 1;
 
@@ -17,32 +17,32 @@
 
         internal static int Read(Method method, byte[] systemData, int position, int jTab, int procBase, int ipc)
         {
-            var code = (OpcodeValue)systemData[position++];
+            var code = (OpCodeValue)systemData[position++];
 
             switch (code)
             {
-                case OpcodeValue.LDCI:
+                case OpCodeValue.LDCI:
                     return method.AddOpCode(new ConstantWord(BitConverter.ToUInt16(systemData, position)));
-                case OpcodeValue.LDL:
-                case OpcodeValue.LLA:
-                case OpcodeValue.STL:
+                case OpCodeValue.LDL:
+                case OpCodeValue.LLA:
+                case OpCodeValue.STL:
                     return method.AddOpCode(new LocalWord(code, OpCode.ReadBig(systemData, position)));
-                case OpcodeValue.LDO:
-                case OpcodeValue.LAO:
-                case OpcodeValue.SRO:
+                case OpCodeValue.LDO:
+                case OpCodeValue.LAO:
+                case OpCodeValue.SRO:
                     return method.AddOpCode(new GlobalWord(code, OpCode.ReadBig(systemData, position)));
-                case OpcodeValue.LOD:
-                case OpcodeValue.LDA:
-                case OpcodeValue.STR:
+                case OpCodeValue.LOD:
+                case OpCodeValue.LDA:
+                case OpCodeValue.STR:
                     return method.AddOpCode(new IntermediateWord(code, systemData[position++],
                         OpCode.ReadBig(systemData, position)));
-                case OpcodeValue.LDE:
-                case OpcodeValue.LAE:
-                case OpcodeValue.STE:
+                case OpCodeValue.LDE:
+                case OpCodeValue.LAE:
+                case OpCodeValue.STE:
                     return method.AddOpCode(new ExternalWord(code,
                         ((Unit)method.Unit).Container.UnitMap[systemData[position]].Name, systemData[position++],
                         OpCode.ReadBig(systemData, position)));
-                case OpcodeValue.LDC:
+                case OpCodeValue.LDC:
                 {
                     var count = systemData[position++];
                     var value = new int[count];
@@ -54,37 +54,37 @@
 
                     return method.AddOpCode(new ConstantWordList(value));
                 }
-                case OpcodeValue.LDM:
-                case OpcodeValue.STM:
-                case OpcodeValue.SAS:
-                case OpcodeValue.ADJ:
-                case OpcodeValue.CLP:
-                case OpcodeValue.CGP:
-                case OpcodeValue.CIP:
-                case OpcodeValue.CBP:
+                case OpCodeValue.LDM:
+                case OpCodeValue.STM:
+                case OpCodeValue.SAS:
+                case OpCodeValue.ADJ:
+                case OpCodeValue.CLP:
+                case OpCodeValue.CGP:
+                case OpCodeValue.CIP:
+                case OpCodeValue.CBP:
                     return method.AddOpCode(new CountByte(code, systemData[position]));
-                case OpcodeValue.LSA:
+                case OpCodeValue.LSA:
                     return
                         method.AddOpCode(new ConstantString(Encoding.ASCII.GetString(systemData, position + 1,
                             systemData[position])));
-                case OpcodeValue.MOV:
-                case OpcodeValue.IND:
-                case OpcodeValue.INC:
-                case OpcodeValue.IXA:
+                case OpCodeValue.MOV:
+                case OpCodeValue.IND:
+                case OpCodeValue.INC:
+                case OpCodeValue.IXA:
                     return method.AddOpCode(new CountBig(code, OpCode.ReadBig(systemData, position)));
-                case OpcodeValue.IXP:
+                case OpCodeValue.IXP:
                     return method.AddOpCode(new IndexPacked(systemData[position], systemData[position + 1]));
-                case OpcodeValue.EQU:
-                case OpcodeValue.NEQ:
-                case OpcodeValue.LEQ:
-                case OpcodeValue.LES:
-                case OpcodeValue.GEQ:
-                case OpcodeValue.GRT:
+                case OpCodeValue.EQU:
+                case OpCodeValue.NEQ:
+                case OpCodeValue.LEQ:
+                case OpCodeValue.LES:
+                case OpCodeValue.GEQ:
+                case OpCodeValue.GRT:
                     return method.AddOpCode(new Type(code, systemData[position]));
-                case OpcodeValue.UJP:
-                case OpcodeValue.FJP:
-                case OpcodeValue.EFJ:
-                case OpcodeValue.NFJ:
+                case OpCodeValue.UJP:
+                case OpCodeValue.FJP:
+                case OpCodeValue.EFJ:
+                case OpCodeValue.NFJ:
                 {
                     int address = (sbyte)systemData[position];
                     var isInTable = address < 0;
@@ -93,9 +93,9 @@
                                   - (BitConverter.ToUInt16(systemData, jTab + address) - address);
                     else
                         address += ipc + 2;
-                    return method.AddOpCode(new Jump(code, isInTable, address, code != OpcodeValue.UJP));
+                    return method.AddOpCode(new Jump(code, isInTable, address, code != OpCodeValue.UJP));
                 }
-                case OpcodeValue.XJP:
+                case OpCodeValue.XJP:
                 {
                     var lastPosition = position;
                     position = position + 1 & ~1;
@@ -121,18 +121,18 @@
 
                     return method.AddOpCode(new JumpTable(min, addrs, def, isPadded));
                 }
-                case OpcodeValue.CXP:
+                case OpCodeValue.CXP:
                     return
                         method.AddOpCode(
                             new ExternalCall(((Unit)method.Unit).Container.UnitMap[systemData[position]].Name,
                                 systemData[position++], systemData[position]));
-                case OpcodeValue.CSP:
+                case OpCodeValue.CSP:
                     return method.AddOpCode(new CallStandardProcedure(systemData[position]));
-                case OpcodeValue.RNP:
-                case OpcodeValue.RBP:
+                case OpCodeValue.RNP:
+                case OpCodeValue.RBP:
                     return method.AddOpCode(new ExitByte(systemData[position]));
                     //return method.AddOpCode(new Exit(code));
-                case OpcodeValue.XIT:
+                case OpCodeValue.XIT:
                     return method.AddOpCode(new Exit(code, false));
             }
 
@@ -149,7 +149,7 @@
             return value;
         }
 
-        public override string ToString() => Enum.GetName(typeof(OpcodeValue), this.Id) ?? "INVALID";
+        public override string ToString() => Enum.GetName(typeof(OpCodeValue), this.Id) ?? "INVALID";
 
         public override int GetHashCode() => this.Id.GetHashCode();
     }

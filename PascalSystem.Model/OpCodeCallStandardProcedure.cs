@@ -176,7 +176,7 @@ namespace PascalSystem.Model
                 CSP_MAV = 40
             }
 
-            public CallStandardProcedure(int subCode) : base(OpcodeValue.CSP) => this.SubType =
+            public CallStandardProcedure(int subCode) : base(OpCodeValue.CSP) => this.SubType =
                 (StandardCall)subCode;
 
             public StandardCall SubType { get; }

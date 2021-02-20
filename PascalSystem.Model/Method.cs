@@ -4,6 +4,7 @@
     using System.CodeDom.Compiler;
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
+    using System.Runtime.CompilerServices;
 
     public class Method
     {
@@ -13,17 +14,17 @@
 
         public int Id { get; }
 
-        public Method(byte[] systemData, int jumpTable, int procedureId, Unit unit, Method? previousMethod)
+        public Method(byte[] systemData, int jumpTable, int procedureId, Unit unit)//, Method? previousMethod)
         {
             this.Id = procedureId;
             this.Unit = unit;
 
             this.lexLevel = systemData[jumpTable + 1];
 
-            while (previousMethod != null && previousMethod.lexLevel >= this.lexLevel)
-                previousMethod = previousMethod.Parent;
+            //while (previousMethod != null && previousMethod.lexLevel >= this.lexLevel)
+            //    previousMethod = previousMethod.Parent;
 
-            this.Parent = previousMethod;
+            //this.Parent = previousMethod;
             //jumpTable -= 2;
             var procBase = BitConverter.ToUInt16(systemData, jumpTable - 2);
             var position = jumpTable - procBase - 2;
@@ -44,7 +45,7 @@
         public WordCount DataLength { get; }
         public int ReturnLength { get; private set; }
 
-        public Method? Parent { get; }
+        //public Method? Parent { get; }
 
         public string Name => "M" + this.Id;
 
@@ -53,6 +54,7 @@
         public Unit Unit { get; }
 
         public IList<OpCode> OpCodes => this.opCodes;
+        public int Level => this.lexLevel;
 
         public void Dump(IndentedTextWriter writer)
         {

@@ -3,7 +3,7 @@
 // ReSharper disable CommentTypo
 namespace PascalSystem.Model
 {
-    public enum OpcodeValue : byte
+    public enum OpCodeValue : byte
     {
         /// <summary>
         ///     Short LoaD Constant 0

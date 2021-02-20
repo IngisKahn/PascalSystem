@@ -5,30 +5,30 @@
 
     public class UnaryMath : Unary
     {
-        public UnaryMath(OpcodeValue ocv, Expression operand) : base(operand) => this
+        public UnaryMath(OpCodeValue ocv, Expression operand) : base(operand) => this
             .Operation = ocv;
 
-        public OpcodeValue Operation { get; }
+        public OpCodeValue Operation { get; }
 
         internal override void BuildString(StringBuilder builder)
         {
             var isFunction = false;
             switch (this.Operation)
             {
-                case OpcodeValue.LNOT:
+                case OpCodeValue.LNOT:
                     builder.Append('~');
                     break;
-                case OpcodeValue.NGI:
-                case OpcodeValue.NGR:
+                case OpCodeValue.NGI:
+                case OpCodeValue.NGR:
                     builder.Append('-');
                     break;
-                case OpcodeValue.ABI:
-                case OpcodeValue.ABR:
+                case OpCodeValue.ABI:
+                case OpCodeValue.ABR:
                     builder.Append("Abs(");
                     isFunction = true;
                     break;
-                case OpcodeValue.SQI:
-                case OpcodeValue.SQR:
+                case OpCodeValue.SQI:
+                case OpCodeValue.SQR:
                     builder.Append("Sqr(");
                     isFunction = true;
                     break;
@@ -46,6 +46,6 @@
 
     public partial class Expression
     {
-        public static UnaryMath UnaryMath(OpcodeValue opCodeValue, Expression child) => new(opCodeValue, child);
+        public static UnaryMath UnaryMath(OpCodeValue opCodeValue, Expression child) => new(opCodeValue, child);
     }
 }

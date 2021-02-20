@@ -4,7 +4,7 @@
     {
         public class ExternalWord : OffsetWord
         {
-            public ExternalWord(OpcodeValue code, string segment, int segNum, int offset)
+            public ExternalWord(OpCodeValue code, string segment, int segNum, int offset)
                 : base(code, offset)
             {
                 this.Segment = segment;
