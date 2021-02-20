@@ -81,6 +81,7 @@
             }
 
             WordCount offset;
+            Types.Base type;
             switch (opCode.Id)
             {
                 case OpCodeValue.NOP:
@@ -123,6 +124,40 @@
                     offset = (WordCount)((OpCode.LocalWord)opCode).Offset;
                     this.Statements.Add(Expression.Assign(
                         this.LocalVariable(new SizeRange((BitCount)1, (BitCount)16), offset), state.VmStack.Pop()));
+                    break;// One-word load and stores global
+                          // Short Load Global Word
+                case OpCodeValue.SLDO_1:
+                case OpCodeValue.SLDO_2:
+                case OpCodeValue.SLDO_3:
+                case OpCodeValue.SLDO_4:
+                case OpCodeValue.SLDO_5:
+                case OpCodeValue.SLDO_6:
+                case OpCodeValue.SLDO_7:
+                case OpCodeValue.SLDO_8:
+                case OpCodeValue.SLDO_9:
+                case OpCodeValue.SLDO_10:
+                case OpCodeValue.SLDO_11:
+                case OpCodeValue.SLDO_12:
+                case OpCodeValue.SLDO_13:
+                case OpCodeValue.SLDO_14:
+                case OpCodeValue.SLDO_15:
+                case OpCodeValue.SLDO_16:
+                case OpCodeValue.LDO: // Load Global
+                    offset = (WordCount)(opCode.Id == OpCodeValue.LDO
+                        ? ((OpCode.GlobalWord)opCode).Offset
+                        : opCode.Id - OpCodeValue.SLDO_1 + 1);
+                    type = this.decompiler.Globals[this.method.Unit.Number - 1].MeetAt(offset, new Types.SizeRange((BitCount)1, (BitCount)16));
+                    state.VmStack.Push(Expression.Global(offset, type));
+                    break;
+                case OpCodeValue.LAO: // Load Address Global
+                    offset = (WordCount)((OpCode.GlobalWord)opCode).Offset;
+                    type = this.decompiler.Globals[this.method.Unit.Number - 1].MeetAt(offset, Types.Void.Instance);
+                    state.VmStack.Push(Expression.AddressOf(Expression.Global(offset, type)));
+                    break;
+                case OpCodeValue.SRO: // Store Global
+                    offset = (WordCount)((OpCode.GlobalWord)opCode).Offset;
+                    type = this.decompiler.Globals[this.method.Unit.Number - 1].MeetAt(offset, new Types.SizeRange((BitCount)1, (BitCount)16));
+                    this.Statements.Add(Expression.Assign(Expression.Global(offset, type), state.VmStack.Pop()));
                     break;
                 default:
                     //throw new DecompilationException("Invalid Op Code: " + opCode.Id);
@@ -149,7 +184,7 @@
         {
             await writer.WriteLineAsync("BEGIN");
             writer.Indent++;
-            foreach (var statement in this.Statements.Cast<Statement>())
+            foreach (var statement in this.Statements)
                 await statement.Dump(writer);
             writer.Indent--;
             await writer.WriteLineAsync("END; {" + this.Signature.Name + "}");

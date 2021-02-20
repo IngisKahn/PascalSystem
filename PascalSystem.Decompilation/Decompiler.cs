@@ -7,11 +7,13 @@
     using System.Linq;
     using System.Threading.Tasks;
     using Model;
+    using Types;
 
     public class Decompiler
     {
         private readonly  (Unit? Unit, MethodAnalyzer[]? MethodAnalyzers)[] unitMethods;
-        
+        public Interval[] Globals { get; }
+
         public MethodAnalyzer GetMethod(int unitId, int methodId)
         {
             if (unitId < 0 || unitId >= this.unitMethods.Length)
@@ -32,10 +34,14 @@
             var maxId = source.Last().Number;
 
             this.unitMethods = new (Unit? Unit, MethodAnalyzer[]? MethodAnalyzers)[maxId];
+            this.Globals = new Interval[maxId];
             foreach (var unit in source)
+            {
                 this.unitMethods[unit.Number - 1] = (unit, unit.Methods.Values.OrderBy(m => m.Id)
-                                                                          .Select(m => new MethodAnalyzer(this, m))
-                                                                          .ToArray());
+                    .Select(m => new MethodAnalyzer(this, m))
+                    .ToArray());
+                this.Globals[unit.Number - 1] = new((ByteCount)0);
+            }
         }
 
         public void ProcessUnits()

@@ -52,8 +52,8 @@
                 var otherRange = other.As<SizeRange>();
                 var oldMin = this.Minimum;
                 var oldMax = this.Maximum;
-                this.Minimum = (BitCount)Math.Min((int)this.Minimum, (int)otherRange.Minimum);
-                this.Maximum = (BitCount)Math.Max((int)this.Maximum, (int)otherRange.Maximum);
+                this.Minimum = (BitCount)Math.Max((int)this.Minimum, (int)otherRange.Minimum);
+                this.Maximum = (BitCount)Math.Min((int)this.Maximum, (int)otherRange.Maximum);
                 hasChanged |= this.Minimum != oldMin || this.Maximum != oldMax;
                 return this;
             }

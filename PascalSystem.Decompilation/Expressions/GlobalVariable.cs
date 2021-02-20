@@ -1,6 +1,7 @@
 ﻿namespace PascalSystem.Decompilation.Expressions
 {
     using System.Text;
+    using Model;
 
     public class GlobalVariable : OffsetVariable
     {
@@ -10,5 +11,11 @@
         {
             builder.Append("Global" + ((int)this.Offset).ToString("X"));
         }
+    }
+
+    public partial class Expression
+    {
+        public static GlobalVariable Global(WordCount offset, Types.Base type) =>
+            new GlobalVariable(offset, type.Proxy());
     }
 }
