@@ -1,15 +1,16 @@
 ﻿namespace PascalSystem.Decompilation.Types
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Linq;
     using Model;
 
-    public class Interval
+    public class Interval : IEnumerable<Interval.Slot>
     {
-        private readonly struct RangeSlot
+        public readonly struct Slot
         {
-            public RangeSlot(ByteCount offset, Base type)
+            public Slot(ByteCount offset, Base type)
             {
                 this.Offset = offset;
                 this.Type = type;
@@ -22,15 +23,15 @@
             public override string ToString() => $"{this.Type} @0x{this.Offset:X} b";
         }
 
-        private class RangeSlotComparer : IComparer<RangeSlot>
+        private class RangeSlotComparer : IComparer<Slot>
         {
-            public int Compare(RangeSlot x, RangeSlot y) => ((int)x.Offset).CompareTo((int)y.Offset);
+            public int Compare(Slot x, Slot y) => ((int)x.Offset).CompareTo((int)y.Offset);
         }
 
         private static readonly RangeSlotComparer slotComparer = new();
         //private readonly int maxByte;
 
-        private readonly List<RangeSlot> slots = new();
+        private readonly List<Slot> slots = new();
 
         public Interval(ByteCount bytes) { }
 
@@ -38,7 +39,7 @@
 
         internal Base MeetAt(ByteCount offset, Base type)
         {
-            var slot = new RangeSlot(offset, type.Proxy());
+            var slot = new Slot(offset, type.Proxy());
             if (this.slots.Count == 0)
             {
                 this.slots.Add(slot);
@@ -49,7 +50,7 @@
             if (pos < 0)
                 pos = ~pos;// - 1;
 
-            RangeSlot? left = null, right = null;
+            Slot? left = null, right = null;
             if (pos > 0) // check left
                 left = this.slots[pos - 1];
             var b = false;
@@ -95,12 +96,15 @@
         {
             if (this.slots.Count == 0)
                 return null;
-            var slot = new RangeSlot(offset, Void.Instance);
+            var slot = new Slot(offset, Void.Instance);
             var pos = this.slots.BinarySearch(slot, Interval.slotComparer);
 
             return pos < 0 ? null : this.slots[pos].Type;
         }
 
         public static explicit operator Base[](Interval range) => range.slots.Select(s => s.Type).ToArray();
+        public IEnumerator<Slot> GetEnumerator() => this.slots.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
     }
 }

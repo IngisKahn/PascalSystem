@@ -12,7 +12,7 @@
         {
             StringBuilder stringBuilder = new();
             this.BuildString(stringBuilder);
-            return writer.WriteLineAsync(stringBuilder.ToString());
+            return writer.WriteLineAsync(stringBuilder + ";");
         }
 
         public override string ToString()

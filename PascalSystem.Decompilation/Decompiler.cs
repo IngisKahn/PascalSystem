@@ -6,6 +6,7 @@
     using System.IO;
     using System.Linq;
     using System.Threading.Tasks;
+    using Expressions;
     using Model;
     using Types;
 
@@ -16,6 +17,8 @@
 
         public MethodAnalyzer GetMethod(int unitId, int methodId)
         {
+            unitId--;
+            methodId--;
             if (unitId < 0 || unitId >= this.unitMethods.Length)
                 throw new ArgumentOutOfRangeException(nameof(unitId));
             var (unit, methodAnalyzers) = this.unitMethods[unitId];
@@ -61,6 +64,19 @@
                 var isProgram = unit.Number == 1;
                 await w.WriteLineAsync((isProgram ? "PROGRAM " : "UNIT ") + unit.Name + ';');
                 // write vars
+                var globals = this.Globals[unit.Number - 1];
+                if (globals?.Count > 0)
+                {
+                    await w.WriteLineAsync("VAR");
+                    w.Indent++;
+                    foreach (var global in globals)
+                    {
+                        GlobalVariable expression = new(global.Offset, global.Type);
+                        await w.WriteLineAsync(expression + ";");
+                    }
+                    w.Indent--;
+                    await w.WriteLineAsync();
+                }
                 // write lvl 1s
                 foreach (var methodAnalyzer in methodAnalyzers.Where(m => m.Level == 1))
                     await methodAnalyzer.Dump(w);

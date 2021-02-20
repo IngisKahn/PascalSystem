@@ -2,6 +2,7 @@
 {
     using System.Collections.Generic;
     using System.Text;
+    using Model;
 
     public class Call : Expression
     {
@@ -24,16 +25,34 @@
             if (this.Parameters.Count == 0)
                 return;
             builder.Append('(');
-            for (var i = 1; i < this.Parameters.Count; i++)
+            var once = false;
+            foreach (var p in this.Parameters)
             {
-                builder.Append(", ");
-                this.Parameters[i].BuildString(builder);
+                if (once)
+                    builder.Append(", ");
+                else
+                    once = true;
+                p.BuildString(builder);
             }
+
             builder.Append(')');
-            if (this.Parameters[0].Type is Types.Void)
-                return;
-            builder.Append(" : ");
-            builder.Append(this.Parameters[0]);
+        }
+    }
+
+    public partial class Expression
+    {
+        public static Call Call(MethodAnalyzer mti, IList<Expression> parameters, bool isExternal = false)
+        {
+            BitCount pos = default;
+            foreach (var parameter in parameters)
+            {
+                mti.Signature.Parameters.MeetAt(pos, parameter.Type);
+                pos += (BitCount)16;
+            }
+            // start analyzing child
+            //if (mti.Method != null)
+            //    mti.ProcessDataFlow(mti.Site.TopSite.ToString());
+            return new(mti, parameters, isExternal);
         }
     }
 }
