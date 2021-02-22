@@ -24,7 +24,7 @@
 
         public object? Value { get; }
         public override Types.Base Type { get; }
-        internal override void BuildString(StringBuilder builder) => builder.Append(this.Value);
+        internal override void BuildString(StringBuilder builder) => this.Type.Display(this.Value?? "NIL", builder);
     }
 
     public partial class Expression

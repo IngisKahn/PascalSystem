@@ -24,7 +24,7 @@
             this.FullName = method.Unit.Name + "." + method.Name;
         }
 
-        public MethodSignature(string name, Types.Base[] parameters)
+        public MethodSignature(string name, params Types.Base[] parameters)
         {
             this.Name = name;
             this.FullName = "PASCALSYSTEM." + name;

@@ -36,7 +36,9 @@
 
         IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
 
-        private readonly List<BasicBlock> blockList = new();
+        public List<BasicBlock> BlockList { get; } = new();
+        private int[]? opIndexToAddress;
+        private int[]? blockIndexes;
 
         public Interval Locals { get; }
 
@@ -45,6 +47,36 @@
 
         private record DecompilerState(BasicBlock CurrentBlock, Stack<Expressions.Expression> VmStack);
 
+        private BasicBlock OpIndexToBlock(int index) => this.BlockList[this.blockIndexes?[index] ?? throw new DecompilationException()];
+        private BasicBlock AddressToBlock(int address) => this.OpIndexToBlock(this.opAddressToIndex[address]);
+        private void Split(int fromIndex, int toIndex, bool addEdge = true)
+        {
+            if (this.blockIndexes is null || toIndex >= this.blockIndexes.Length)
+                return;
+            var fromBlockIndex = this.blockIndexes[fromIndex];
+            var fromBlock = this.BlockList[fromBlockIndex];
+
+            var splitFrom = fromBlock.SplitAt(fromIndex + 1);
+            if (splitFrom != null)
+            {
+                this.BlockList.Insert(fromBlockIndex + 1, splitFrom);
+                fromIndex++;
+                while (fromIndex < this.blockIndexes.Length)
+                    this.blockIndexes[fromIndex++]++;
+            }
+            var toBlockIndex = this.blockIndexes[toIndex];
+            var toBlock = this.BlockList[toBlockIndex];
+            var splitTo = toBlock.SplitAt(toIndex);
+            if (splitTo != null)
+            {
+                this.BlockList.Insert(toBlockIndex + 1, splitTo);
+                while (toIndex < this.blockIndexes.Length)
+                    this.blockIndexes[toIndex++]++;
+                toBlock = splitTo;
+            }
+            if (addEdge)
+                fromBlock.AddEdge(toBlock);
+        }
         public void Decompile()
         {
             var opCodes = this.method.OpCodes;
@@ -52,18 +84,25 @@
                 return;
             this.decompiled = true;
 
-            var blockIndexes = new int[opCodes.Count];
-            var opIndexToAddress = new int[opCodes.Count];
+            this.blockIndexes = new int[opCodes.Count];
+            this.opIndexToAddress = new int[opCodes.Count];
 
 
-            this.blockList.Add(new(this, 0, 0, opCodes.Count));
+            this.BlockList.Add(new(this, 0, 0, opCodes.Count));
 
-            DecompilerState state = new(this.blockList[0], new());
+            DecompilerState state = new(this.BlockList[0], new());
+            // map the addresses
+            for (int i = 0, address = 0; i < opCodes.Count; address += opCodes[i++].Length)
+            {
+                this.opAddressToIndex[address] = i;
+                this.opIndexToAddress[i] = address;
+            }
 
             for (int i = 0, address = 0; i < opCodes.Count; i++)
             {
                 var opCode = opCodes[i];
-                opIndexToAddress[i] = address;
+                this.opIndexToAddress[i] = address;
+                this.opAddressToIndex[address] = i;
 
 
                 this.Decompile(opCode, i, state);
@@ -83,6 +122,7 @@
 
             WordCount offset;
             Types.Base type;
+            Expression tempX;
             switch (opCode.Id)
             {
                 case OpCodeValue.NOP:
@@ -164,6 +204,98 @@
                 case OpCodeValue.LSA: // Load String Address
                     state.VmStack.Push(Expression.Constant<Types.String>(((OpCode.ConstantString)opCode).Value));
                     break;
+                case OpCodeValue.ADI:
+                case OpCodeValue.SBI:
+                case OpCodeValue.MPI:
+                case OpCodeValue.DVI:
+                case OpCodeValue.MODI:
+                case OpCodeValue.LAND: // Logical And
+                case OpCodeValue.LOR: // Logical Or
+                    tempX = state.VmStack.Pop();
+                    state.VmStack.Push(Expression.BinaryIMath(opCode.Id, state.VmStack.Pop(), tempX));
+                    break;
+                case OpCodeValue.ADR:
+                case OpCodeValue.SBR:
+                case OpCodeValue.MPR:
+                case OpCodeValue.DVR:
+                    tempX = state.VmStack.Pop();
+                    state.VmStack.Push(Expression.BinaryRMath(opCode.Id, state.VmStack.Pop(), tempX));
+                    break;
+                case OpCodeValue.NEQI:
+                case OpCodeValue.EQUI:
+                case OpCodeValue.GRTI:
+                case OpCodeValue.LESI:
+                case OpCodeValue.GEQI:
+                case OpCodeValue.LEQI:
+                    tempX = state.VmStack.Pop();
+                    state.VmStack.Push(Expression.Compare(opCode.Id - OpCodeValue.EQUI, 0, state.VmStack.Pop(), tempX));
+                    break;
+                case OpCodeValue.NEQ:
+                case OpCodeValue.EQU:
+                case OpCodeValue.GRT:
+                case OpCodeValue.LES:
+                case OpCodeValue.GEQ:
+                case OpCodeValue.LEQ:
+                    tempX = state.VmStack.Pop();
+                    state.VmStack.Push(Expression.Compare(opCode.Id - OpCodeValue.EQU, ((OpCode.Type)opCode).TypeCode,
+                        state.VmStack.Pop(), tempX));
+                    break;
+                case OpCodeValue.LNOT: // Logical Not
+                case OpCodeValue.NGI: // Negate Integer
+                case OpCodeValue.ABI: // Absolute Value Integer
+                case OpCodeValue.SQI: // Square Integer
+                    state.VmStack.Push(Expression.UnaryIMath(opCode.Id, state.VmStack.Pop()));
+                    break;
+                case OpCodeValue.NGR: // Negate Real
+                case OpCodeValue.ABR: // Absolute Value Real
+                case OpCodeValue.SQR: // Square Real
+                    state.VmStack.Push(Expression.UnaryRMath(opCode.Id, state.VmStack.Pop()));
+                    break;
+                case OpCodeValue.FJP:
+                    {
+                        var jump = (OpCode.Jump)opCode;
+                        this.Split(index, index + 1);
+                        this.Split(index, this.opAddressToIndex[jump.Address]);
+                        this.Statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
+                            this.AddressToBlock(jump.Address),
+                            state.VmStack.Pop()));
+                        break;
+                    }
+                case OpCodeValue.EFJ:
+                    {
+                        var jump = (OpCode.Jump)opCode;
+                        this.Split(index, index + 1);
+                        this.Split(index, this.opAddressToIndex[jump.Address]);
+                        this.Statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
+                        this.AddressToBlock(jump.Address),
+                        Expression.Compare(0, 0, state.VmStack.Pop(), state.VmStack.Pop())));
+                        break;
+                    }
+                case OpCodeValue.NFJ:
+                {
+                    var jump = (OpCode.Jump)opCode;
+                    this.Split(index, index + 1);
+                    this.Split(index, this.opAddressToIndex[jump.Address]);
+                    this.Statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
+                        this.AddressToBlock(jump.Address),
+                        Expression.Compare(8, 0, state.VmStack.Pop(), state.VmStack.Pop())));
+                    break;
+                    }
+                case OpCodeValue.UJP:
+                {
+                    var jump = (OpCode.Jump)opCode;
+                    this.Split(index, index + 1);
+                    this.Split(index, this.opAddressToIndex[jump.Address]);
+                    break;
+                }
+                case OpCodeValue.XJP:
+                    var xjp = (OpCode.JumpTable)opCode;
+                    this.Split(index, this.opAddressToIndex[xjp.DefaultAddress]);
+                    foreach (var address in xjp.Addresses)
+                        this.Split(index, this.opAddressToIndex[address]);
+                    this.Statements.Add(new Case(xjp.Minimum, this.AddressToBlock(xjp.DefaultAddress),
+                        from a in xjp.Addresses select this.AddressToBlock(a), state.VmStack.Pop()));
+                    break;
                 case OpCodeValue.CBP: // Call Base Procedure - call the main program
                 case OpCodeValue.CXP: // Call External Procedure - call a global procedure in another unit
                 case OpCodeValue.CGP: // Call Global Procedure - call a top level procedure in same unit
@@ -212,11 +344,119 @@
                             p.Add(e);
                         }
                         Debug.Assert((int)size == 0);
-                        var call = Expression.Call(methodAnalyzer, p, isExternal);
-                        if (call.MethodInfo.Signature.ReturnType.ResolvesTo<Types.Void>())
+                        var call = Expression.Call(methodAnalyzer.Signature, p, isExternal);
+                        if (call.MethodInfo.ReturnType.ResolvesTo<Types.Void>())
                             this.Statements.Add(call);
                         else
                             state.VmStack.Push(call);
+                    }
+                    break;
+                case OpCodeValue.RNP:
+                    break;
+                case OpCodeValue.CSP:
+                    var subType = ((OpCode.CallStandardProcedure)opCode).SubType;
+                    switch (subType)
+                    {
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_IOC:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_NEW:
+                            throw new InvalidOperationException();
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_MVL:
+                            {
+                                var p = new List<Expression>(3);
+                                var x = 3;
+                                while (x-- > 0)
+                                    p.Insert(0, state.VmStack.Pop());
+                                this.Statements.Add(
+                                    Expression.Call(Decompiler.MoveLeft, p));
+                            }
+                            break;
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_MVR:
+                            throw new InvalidOperationException();
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_XIT:
+                            {
+                                var proc = (short)(((Constant)state.VmStack.Pop()).Value ?? -1);
+                                var unitNumber = (short)(((Constant)state.VmStack.Pop()).Value ?? -1);
+                                var site = this.decompiler.GetMethod(unitNumber, proc);
+                                this.Statements.Add(new Exit(site.method.Unit.Name, proc));
+                            }
+                            break;
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_UREAD:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_UWRITE:
+                            {
+                                var p = new List<Expression>(6);
+                                var x = 6;
+                                while (x-- > 0)
+                                    p.Insert(0, state.VmStack.Pop());
+                                this.Statements.Add(
+                                    Expression.Call(
+                                        subType == OpCode.CallStandardProcedure.StandardCall.CSP_UREAD
+                                            ? Decompiler.UnitRead
+                                            : Decompiler.UnitWrite, p));
+                            }
+                            break;
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_IDS:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_TRS:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_TIM:
+                            throw new InvalidOperationException();
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_FLC:
+                            {
+                                var p = new List<Expression>(4);
+                                var x = 4;
+                                while (x-- > 0)
+                                    p.Insert(0, state.VmStack.Pop());
+                                this.Statements.Add(
+                                    Expression.Call(Decompiler.FillChar, p));
+                            }
+                            break;
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_SCN:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_USTAT:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_LDSEG:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_ULDSEG:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_TRC:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_RND:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_SIN:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_COS:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_TAN:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_ATAN:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_LN:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_EXP:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_SQRT:
+                            throw new InvalidOperationException();
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_MRK:
+                            {
+                                var p = new Expression[1];
+                                p[0] = state.VmStack.Pop();
+                                this.Statements.Add(Expression.Call(Decompiler.Mark, p));
+                            }
+                            break;
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_RLS:
+                            {
+                                var p = new Expression[1];
+                                p[0] = state.VmStack.Pop();
+                                this.Statements.Add(Expression.Call(Decompiler.Release, p));
+                            }
+                            break;
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_IOR:
+                            state.VmStack.Push(Expression.Call(Decompiler.Ioresult, new Expression[0]));
+                            break;
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_UBUSY:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_POT:
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_UWAIT:
+                            throw new InvalidOperationException();
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_UCLEAR:
+                            {
+                                var p = new Expression[1];
+                                p[0] = state.VmStack.Pop();
+                                this.Statements.Add(Expression.Call(Decompiler.Uclear, p));
+                            }
+                            break;
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_HLT:
+                            throw new InvalidOperationException();
+                        case OpCode.CallStandardProcedure.StandardCall.CSP_MAV:
+                            state.VmStack.Push(Expression.Call(Decompiler.Ioresult, new Expression[0]));
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
                     }
                     break;
                 default:

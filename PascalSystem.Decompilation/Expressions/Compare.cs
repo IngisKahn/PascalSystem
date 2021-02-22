@@ -41,7 +41,7 @@
         }
 
         public int Operation { get; }
-        public Types.Base ResultType => new Types.Boolean();
+        public override Types.Base Type => new Types.Boolean();
 
         internal override void BuildString(StringBuilder builder)
         {
@@ -71,5 +71,11 @@
             }
             this.Right.BuildString(builder);
         }
+    }
+
+    public partial class Expression
+    {
+        public static Compare Compare(int operation, int type, Expression left, Expression right) =>
+            new(operation, type, left, right);
     }
 }

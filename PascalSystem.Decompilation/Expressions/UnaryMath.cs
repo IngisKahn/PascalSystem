@@ -46,6 +46,19 @@
 
     public partial class Expression
     {
-        public static UnaryMath UnaryMath(OpCodeValue opCodeValue, Expression child) => new(opCodeValue, child);
+
+        internal static UnaryMath UnaryIMath(OpCodeValue ocv, Expression operand)
+        {
+            var b = false;
+            operand.Type.MeetWith(new Types.Integer(), ref b);
+            return new(ocv, operand);
+        }
+
+        internal static UnaryMath UnaryRMath(OpCodeValue ocv, Expression operand)
+        {
+            var b = false;
+            operand.Type.MeetWith(new Types.Real(), ref b);
+            return new(ocv, operand);
+        }
     }
 }

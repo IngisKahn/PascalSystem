@@ -37,5 +37,6 @@
         //{
         //    throw new NotImplementedException();
         //}
+        public override string ToString() => "STRING";
     }
 }

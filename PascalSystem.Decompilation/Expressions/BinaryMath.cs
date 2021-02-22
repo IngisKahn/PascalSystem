@@ -59,7 +59,21 @@
 
     public partial class Expression
     {
-        public static BinaryMath BinaryMath(OpCodeValue opCodeValue, Expression left, Expression right) =>
-            new(opCodeValue, left, right);
+        public static BinaryMath BinaryIMath(OpCodeValue ocv, Expression left, Expression right)
+        {
+            var b = false;
+            if (!left.Type.ResolvesTo<Types.Pointer>())
+                left.Type.MeetWith(new Types.Integer(), ref b);
+            if (!right.Type.ResolvesTo<Types.Pointer>())
+                right.Type.MeetWith(new Types.Integer(), ref b);
+            return new(ocv, left, right);
+        }
+        public static BinaryMath BinaryRMath(OpCodeValue ocv, Expression left, Expression right)
+        {
+            var b = false;
+            left.Type.MeetWith(new Types.Real(), ref b);
+            right.Type.MeetWith(new Types.Real(), ref b);
+            return new(ocv, left, right);
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿namespace PascalSystem.Decompilation.Types
 {
+    using System.Text;
     using Model;
 
     public class Proxy : Base
@@ -36,5 +37,7 @@
             testAllElements);
 
         public override Base MeetAt(ByteCount offset, Base other) => this.Value.MeetAt(offset, other);
+
+        public override void Display(object value, StringBuilder builder) => this.Value.Display(value, builder);
     }
 }

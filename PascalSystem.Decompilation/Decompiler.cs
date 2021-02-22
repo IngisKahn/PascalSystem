@@ -5,10 +5,13 @@
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Reflection;
     using System.Threading.Tasks;
     using Expressions;
     using Model;
     using Types;
+    using Pointer = Types.Pointer;
+    using Void = Types.Void;
 
     public class Decompiler
     {
@@ -29,6 +32,17 @@
             return methodAnalyzers[methodId];
         }
 
+
+        public static readonly MethodSignature MoveLeft;
+        public static readonly MethodSignature UnitRead;
+        public static readonly MethodSignature UnitWrite;
+        public static readonly MethodSignature FillChar;
+        public static readonly MethodSignature Mark;
+        public static readonly MethodSignature Release;
+        public static readonly MethodSignature Ioresult;
+        public static readonly MethodSignature Uclear;
+        public static readonly MethodSignature Memavail;
+
         public Decompiler(IEnumerable<Model.Unit> units)
         {
             var source = units.OrderBy(u => u.Number).ToArray();
@@ -45,6 +59,24 @@
                     .ToArray());
                 this.Globals[unit.Number - 1] = new((ByteCount)0);
             }
+
+
+        }
+
+        static Decompiler()
+        {
+
+            Decompiler.UnitRead = new("UNITREAD", Void.Instance, new Integer(), new Pointer(new Integer()), new Integer(),
+                new Integer(), new Integer(), new Integer());
+            Decompiler.UnitWrite = new("UNITWRITE", Void.Instance, new Integer(), new Pointer(new Integer()), new Integer(),
+                new Integer(), new Integer(), new Integer());
+            Decompiler.MoveLeft = new("MOVELEFT",  Void.Instance, new Pointer(), new Pointer(), new Integer());
+            Decompiler.FillChar = new("FILLCHAR", Void.Instance, new Pointer(), new Integer(), new Integer(), new Character());
+            Decompiler.Mark = new("MARK", Void.Instance, new Pointer());
+            Decompiler.Release = new("RELEASE", Void.Instance, new Pointer());
+            Decompiler.Ioresult = new("IORESULT", new Integer());
+            Decompiler.Uclear = new("UCLEAR", Void.Instance, new Integer());
+            Decompiler.Memavail = new("MEMAVAIL", new Integer());
         }
 
         public void ProcessUnits()
