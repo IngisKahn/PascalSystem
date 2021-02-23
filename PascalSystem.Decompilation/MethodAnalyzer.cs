@@ -98,6 +98,23 @@
                 this.opIndexToAddress[i] = address;
             }
 
+            for (var index = 0; index < opCodes.Count; index++)
+                switch (opCodes[index])
+                {
+                    case OpCode.Jump jump:
+                        this.Split(index, index + 1, jump.IsConditional);
+                        this.Split(index, this.opAddressToIndex[jump.Address]);
+                        break;
+                    case OpCode.JumpTable switchCase:
+                        this.Split(index, this.opAddressToIndex[switchCase.DefaultAddress]);
+                        foreach (var address in switchCase.Addresses)
+                            this.Split(index, this.opAddressToIndex[address]);
+                        break;
+                    case OpCode.Exit:
+                        this.Split(index, index + 1, false);
+                        break;
+                }
+
             for (int i = 0, address = 0; i < opCodes.Count; i++)
             {
                 var opCode = opCodes[i];
@@ -254,8 +271,6 @@
                 case OpCodeValue.FJP:
                     {
                         var jump = (OpCode.Jump)opCode;
-                        this.Split(index, index + 1);
-                        this.Split(index, this.opAddressToIndex[jump.Address]);
                         this.Statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
                             this.AddressToBlock(jump.Address),
                             state.VmStack.Pop()));
@@ -264,8 +279,6 @@
                 case OpCodeValue.EFJ:
                     {
                         var jump = (OpCode.Jump)opCode;
-                        this.Split(index, index + 1);
-                        this.Split(index, this.opAddressToIndex[jump.Address]);
                         this.Statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
                         this.AddressToBlock(jump.Address),
                         Expression.Compare(0, 0, state.VmStack.Pop(), state.VmStack.Pop())));
@@ -274,28 +287,19 @@
                 case OpCodeValue.NFJ:
                 {
                     var jump = (OpCode.Jump)opCode;
-                    this.Split(index, index + 1);
-                    this.Split(index, this.opAddressToIndex[jump.Address]);
                     this.Statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
                         this.AddressToBlock(jump.Address),
                         Expression.Compare(8, 0, state.VmStack.Pop(), state.VmStack.Pop())));
                     break;
                     }
                 case OpCodeValue.UJP:
-                {
-                    var jump = (OpCode.Jump)opCode;
-                    this.Split(index, index + 1);
-                    this.Split(index, this.opAddressToIndex[jump.Address]);
                     break;
-                }
                 case OpCodeValue.XJP:
                     var xjp = (OpCode.JumpTable)opCode;
-                    this.Split(index, this.opAddressToIndex[xjp.DefaultAddress]);
-                    foreach (var address in xjp.Addresses)
-                        this.Split(index, this.opAddressToIndex[address]);
                     this.Statements.Add(new Case(xjp.Minimum, this.AddressToBlock(xjp.DefaultAddress),
                         from a in xjp.Addresses select this.AddressToBlock(a), state.VmStack.Pop()));
                     break;
+                
                 case OpCodeValue.CBP: // Call Base Procedure - call the main program
                 case OpCodeValue.CXP: // Call External Procedure - call a global procedure in another unit
                 case OpCodeValue.CGP: // Call Global Procedure - call a top level procedure in same unit
