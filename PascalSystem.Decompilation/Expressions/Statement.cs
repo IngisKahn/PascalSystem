@@ -8,7 +8,26 @@
     public abstract class Statement : Expression
     {
         public override Types.Base Type => Types.Void.Instance;
-        
+
+        protected static async Task WriteChildren(string label, IList<Expression> children, IndentedTextWriter writer)
+        {
+            if (children.Count == 1)
+            {
+                writer.Indent++;
+                await children[0].Dump(writer);
+                //await writer.WriteLineAsync(";");
+                writer.Indent--;
+            }
+            else
+            {
+                await writer.WriteLineAsync("BEGIN");
+                writer.Indent++;
+                foreach (var child in children)
+                    await child.Dump(writer);
+                writer.Indent--;
+                await writer.WriteLineAsync($"END; {{{label}}}");
+            }
+        }
     }
 
     public class Block : Statement

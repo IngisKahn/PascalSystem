@@ -138,17 +138,17 @@
             Queue<DecompilerState> stateQueue = new();
             stateQueue.Enqueue(new(this.BlockList[0], new()));
             var visited = new bool[this.BlockList.Count];
-            visited[0] = true;
             while (stateQueue.Count > 0)
             {
                 var (currentBlock, vmStack) = stateQueue.Dequeue();
+                visited[currentBlock.Id] = true;
                 for (var i = currentBlock.StartIndex; i <= currentBlock.EndIndex; i++)
                 {
                     var opCode = opCodes[i];
                     this.Decompile(opCode, i, currentBlock.Statements, vmStack);
                 }
 
-                foreach (var controlEdge in currentBlock.EdgesOut)
+                foreach (var controlEdge in from controlEdge in currentBlock.EdgesOut where !visited[controlEdge.Destination.Id] select controlEdge)
                     stateQueue.Enqueue(new(controlEdge.Destination, new(vmStack)));
             }
         }
@@ -295,25 +295,36 @@
                 case OpCodeValue.FJP:
                     {
                         var jump = (OpCode.Jump)opCode;
-                        statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
-                            this.AddressToBlock(jump.Address),
-                            vmStack.Pop()));
+                        var jumpToBlock = this.AddressToBlock(jump.Address);
+                        var nextBlock = this.OpIndexToBlock(index + 1);
+                        statements.Add(Expression.If(nextBlock,
+                            jumpToBlock,
+                            vmStack.Pop(),
+                                      jumpToBlock.Id > nextBlock.Id && jumpToBlock.EdgesIn.All(e => e.Source.Id != e.Destination.Id - 1)));
                         break;
                     }
                 case OpCodeValue.EFJ:
                     {
                         var jump = (OpCode.Jump)opCode;
-                        statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
-                        this.AddressToBlock(jump.Address),
-                        Expression.Compare(0, 0, vmStack.Pop(), vmStack.Pop())));
+                        var jumpToBlock = this.AddressToBlock(jump.Address);
+                        var nextBlock = this.OpIndexToBlock(index + 1);
+                        statements.Add(Expression.If(nextBlock,
+                            jumpToBlock,
+                            Expression.Compare(0, 0, vmStack.Pop(), vmStack.Pop()),
+                            jumpToBlock.Id > nextBlock.Id &&
+                            jumpToBlock.EdgesIn.All(e => e.Source.Id != e.Destination.Id - 1)));
                         break;
                     }
                 case OpCodeValue.NFJ:
                 {
                     var jump = (OpCode.Jump)opCode;
-                    statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
-                        this.AddressToBlock(jump.Address),
-                        Expression.Compare(8, 0, vmStack.Pop(), vmStack.Pop())));
+                    var jumpToBlock = this.AddressToBlock(jump.Address);
+                    var nextBlock = this.OpIndexToBlock(index + 1);
+                    statements.Add(Expression.If(nextBlock,
+                        jumpToBlock,
+                        Expression.Compare(8, 0, vmStack.Pop(), vmStack.Pop()),
+                        jumpToBlock.Id > nextBlock.Id &&
+                        jumpToBlock.EdgesIn.All(e => e.Source.Id != e.Destination.Id - 1)));
                     break;
                     }
                 case OpCodeValue.UJP:
@@ -510,12 +521,22 @@
 
         public async Task DumpCode(IndentedTextWriter writer)
         {
-            await writer.WriteLineAsync("BEGIN");
-            writer.Indent++;
-            foreach (var statement in this.Statements)
-                await statement.Dump(writer);
-            writer.Indent--;
-            await writer.WriteLineAsync("END; {" + this.Signature.Name + "}");
+            if (this.Locals?.Count > 0)
+            {
+                await writer.WriteLineAsync("VAR");
+                writer.Indent++;
+                foreach (var local in this.Locals)
+                {
+                    LocalVariable expression = new(local.Offset, local.Type);
+                    await writer.WriteLineAsync(expression + ";");
+                }
+                writer.Indent--;
+            }
+
+            if (this.BlockList.Count > 0)
+                await this.BlockList[0].Dump(writer);
+            else
+                await writer.WriteAsync(";");
             await writer.WriteLineAsync();
         }
     }
