@@ -2,6 +2,7 @@
 {
     using System.CodeDom.Compiler;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Threading.Tasks;
     using Expressions;
@@ -13,7 +14,7 @@
         public int StartIndex { get; }
         public int EndIndex { get; private set; }
         public string Label { get; }
-        public BasicBlock? ContinuesWith { get; set; }
+        public List<BasicBlock> Dominates { get; } = new();
 
         public BasicBlock(MethodAnalyzer methodAnalyzer, int id, int startIndex, int endIndex)
             : this(methodAnalyzer.Signature.Name, methodAnalyzer, id, startIndex, endIndex) { }
@@ -36,6 +37,8 @@
 
         public void AddEdge(BasicBlock destination)
         {
+            if (this.EdgesOut.Any(e => e.Destination == destination))
+                return;
             // have we been there before?
             var visted = new HashSet<BasicBlock>();
             var pending = new Queue<BasicBlock>();
@@ -71,7 +74,7 @@
                 return null;
             var endIndex = this.EndIndex;
             this.EndIndex = index - 1;
-            var result = new BasicBlock(this.methodAnalyzer, this.methodAnalyzer.BlockList.Count, index, endIndex) { EdgesOut = this.EdgesOut };
+            var result = new BasicBlock(this.methodAnalyzer, this.methodAnalyzer.BlockList.Count, index, endIndex) { EdgesOut = new(this.EdgesOut) };
             foreach (var controlEdge in this.EdgesOut)
                 controlEdge.Source = result;
             this.EdgesOut.Clear();
@@ -103,5 +106,8 @@
             if (this.Statements.Count > 1)
                 await writer.WriteLineAsync("END; {" + this.Label + "}");
         }
+        public override string ToString() => $"BB{this.Id}: Size:{this.Length} "
+                                             + $"In:[{string.Join(", ", this.EdgesIn.Select(ce => ce.Source.Id.ToString(CultureInfo.InvariantCulture)))}] "
+                                             + $"Out:[{string.Join(", ", this.EdgesOut.Select(ce => ce.Destination.Id.ToString(CultureInfo.InvariantCulture)))}]";
     }
 }

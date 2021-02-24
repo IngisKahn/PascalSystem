@@ -128,8 +128,16 @@
                         break;
                 }
 
+            // re number
+            for (var i = 0; i < this.BlockList.Count; i++)
+            {
+                var block = this.BlockList[i];
+                block.Id = i;
+                //block.Address = this.opIndexToAddress[block.StartIndex];
+            }
+
             DominatorData[] data = this.BlockList.Select(_ => new DominatorData()).ToArray();
-            var n = 0;
+            var n = -1;
             void Dfs(int v)
             {
                 var vData = data[v];
@@ -230,12 +238,11 @@
                     dom[w] = dom[dom[w]];
             }
 
-            // re number
-            for (var i = 0; i < this.BlockList.Count; i++)
+            for (var i = 0; i < dom.Length; i++)
             {
-                var block = this.BlockList[i];
-                block.Id = i;
-                //block.Address = this.opIndexToAddress[block.StartIndex];
+                var d = dom[i];
+                if (d != i)
+                    this.BlockList[d].Dominates.Add(this.BlockList[i]);
             }
 
             Queue<DecompilerState> stateQueue = new();
@@ -267,6 +274,8 @@
             public int Size { get; set; } = 1;
             public HashSet<int> Pred { get; } = new();
             public HashSet<int> Bucket { get; } = new();
+
+            public override string ToString() => $"P{this.Parent} A{this.Ancestor} C{this.Child} V{this.Vertex} L{this.Label} Semi{this.Semi} Size{this.Size} Pred[{string.Join(',', this.Pred)}] Bucket[{string.Join(',', this.Bucket)}]";
         }
 
         private void Decompile(OpCode opCode, int index, List<Expression> statements, Stack<Expression> vmStack)
