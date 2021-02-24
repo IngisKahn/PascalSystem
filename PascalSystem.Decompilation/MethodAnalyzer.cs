@@ -97,23 +97,44 @@
                 this.opAddressToIndex[address] = i;
                 this.opIndexToAddress[i] = address;
             }
-
+            
+            // split blocks
             for (var index = 0; index < opCodes.Count; index++)
                 switch (opCodes[index])
                 {
                     case OpCode.Jump jump:
+                        // split after jump
                         this.Split(index, index + 1, jump.IsConditional);
-                        this.Split(index, this.opAddressToIndex[jump.Address]);
+                        var target = this.opAddressToIndex[jump.Address];
+                        //split target
+                        this.Split(index, target);
+                        if (target == 0)
+                            break;
+                        // add edge if fall thru from pre target
+                        var preTarget = opCodes[target - 1];
+                        if (preTarget is OpCode.Jump {IsConditional: true}
+                            || preTarget is OpCode.JumpTable || preTarget is OpCode.Exit)
+                            break;
+                        this.OpIndexToBlock(target - 1).AddEdge(this.OpIndexToBlock(target));
                         break;
                     case OpCode.JumpTable switchCase:
+                        // split to default (may be else block or after)
                         this.Split(index, this.opAddressToIndex[switchCase.DefaultAddress]);
                         foreach (var address in switchCase.Addresses)
                             this.Split(index, this.opAddressToIndex[address]);
                         break;
                     case OpCode.Exit:
+                        // split with no edge
                         this.Split(index, index + 1, false);
                         break;
                 }
+
+            for (var i = 0; i < this.BlockList.Count; i++)
+            {
+                var block = this.BlockList[i];
+                block.Id = i;
+                //block.Address = this.opIndexToAddress[block.StartIndex];
+            }
 
             for (int i = 0, address = 0; i < opCodes.Count; i++)
             {

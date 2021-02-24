@@ -6,24 +6,24 @@
     public class BasicBlock
     {
         private readonly MethodAnalyzer methodAnalyzer;
-        private readonly int id;
+        public int Id { get; set; }
         public int StartIndex { get; }
         public int EndIndex { get; private set; }
 
         public BasicBlock(MethodAnalyzer methodAnalyzer, int id, int startIndex, int endIndex)
         {
             this.methodAnalyzer = methodAnalyzer;
-            this.id = id;
+            this.Id = id;
             this.StartIndex = startIndex;
             this.EndIndex = endIndex;
         }
         public int Length => this.EndIndex - this.StartIndex + 1;
 
-        public List<ControlEdge> EdgesOut { get; private set; } = new();
+        public List<ControlEdge> EdgesOut { get; private init; } = new();
 
         public List<ControlEdge> EdgesIn { get; } = new();
 
-        public override int GetHashCode() => this.id;
+        public override int GetHashCode() => this.Id;
 
         public void AddEdge(BasicBlock destination)
         {
