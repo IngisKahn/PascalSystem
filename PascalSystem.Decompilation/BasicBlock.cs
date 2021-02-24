@@ -2,6 +2,7 @@
 {
     using System.Collections.Generic;
     using System.Linq;
+    using Expressions;
 
     public class BasicBlock
     {
@@ -22,8 +23,9 @@
         public List<ControlEdge> EdgesOut { get; private init; } = new();
 
         public List<ControlEdge> EdgesIn { get; } = new();
+        public List<Expression> Statements { get; } = new();
 
-        public override int GetHashCode() => this.Id;
+        //public override int GetHashCode() => this.Id;
 
         public void AddEdge(BasicBlock destination)
         {

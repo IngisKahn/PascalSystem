@@ -42,7 +42,6 @@
 
         public Interval Locals { get; }
 
-        public List<Expression> Statements { get; } = new();
         public int Level { get; }
 
         private record DecompilerState(BasicBlock CurrentBlock, Stack<Expressions.Expression> VmStack);
@@ -89,8 +88,7 @@
 
 
             this.BlockList.Add(new(this, 0, 0, opCodes.Count));
-
-            DecompilerState state = new(this.BlockList[0], new());
+            
             // map the addresses
             for (int i = 0, address = 0; i < opCodes.Count; address += opCodes[i++].Length)
             {
@@ -129,6 +127,7 @@
                         break;
                 }
 
+            // re number
             for (var i = 0; i < this.BlockList.Count; i++)
             {
                 var block = this.BlockList[i];
@@ -136,25 +135,29 @@
                 //block.Address = this.opIndexToAddress[block.StartIndex];
             }
 
-            for (int i = 0, address = 0; i < opCodes.Count; i++)
+            Queue<DecompilerState> stateQueue = new();
+            stateQueue.Enqueue(new(this.BlockList[0], new()));
+            var visited = new bool[this.BlockList.Count];
+            visited[0] = true;
+            while (stateQueue.Count > 0)
             {
-                var opCode = opCodes[i];
-                this.opIndexToAddress[i] = address;
-                this.opAddressToIndex[address] = i;
+                var (currentBlock, vmStack) = stateQueue.Dequeue();
+                for (var i = currentBlock.StartIndex; i <= currentBlock.EndIndex; i++)
+                {
+                    var opCode = opCodes[i];
+                    this.Decompile(opCode, i, currentBlock.Statements, vmStack);
+                }
 
-
-                this.Decompile(opCode, i, state);
-
-
-                address += opCode.Length;
+                foreach (var controlEdge in currentBlock.EdgesOut)
+                    stateQueue.Enqueue(new(controlEdge.Destination, new(vmStack)));
             }
         }
 
-        private void Decompile(OpCode opCode, int index, DecompilerState state)
+        private void Decompile(OpCode opCode, int index, List<Expression> statements, Stack<Expression> vmStack)
         {
             if (opCode.Id <= OpCodeValue.SLDC_127) // One word Load and Stores constant
             {
-                state.VmStack.Push(Expression.Constant((int)opCode.Id));
+                vmStack.Push(Expression.Constant((int)opCode.Id));
                 return;
             }
 
@@ -166,10 +169,10 @@
                 case OpCodeValue.NOP:
                     break;
                 case OpCodeValue.LDCN: // Load Constant Nil
-                    state.VmStack.Push(Expression.Constant<Pointer>(null));
+                    vmStack.Push(Expression.Constant<Pointer>(null));
                     break;
                 case OpCodeValue.LDCI: // Load Constant Integer
-                    state.VmStack.Push(Expression.Constant<Integer>(((OpCode.ConstantWord)opCode).Value));
+                    vmStack.Push(Expression.Constant<Integer>(((OpCode.ConstantWord)opCode).Value));
                     break;// One-word load and stores local
                 // SLDL Short LoaD Local 1..16 
                 case OpCodeValue.SLDL_1:
@@ -192,17 +195,17 @@
                     offset = (WordCount)(opCode.Id == OpCodeValue.LDL
                         ? ((OpCode.LocalWord)opCode).Offset
                         : opCode.Id - OpCodeValue.SLDL_1 + 1);
-                    state.VmStack.Push(this.LocalVariable(new Types.SizeRange((BitCount)1, (BitCount)16), offset));
+                    vmStack.Push(this.LocalVariable(new Types.SizeRange((BitCount)1, (BitCount)16), offset));
                     break;
                 case OpCodeValue.LLA: // Load Local Address
                     offset = (WordCount)((OpCode.LocalWord)opCode).Offset;
-                    state.VmStack.Push(Expression.AddressOf(
+                    vmStack.Push(Expression.AddressOf(
                         this.LocalVariable(Void.Instance, offset)));
                     break;
                 case OpCodeValue.STL: // Store Local
                     offset = (WordCount)((OpCode.LocalWord)opCode).Offset;
-                    this.Statements.Add(Expression.Assign(
-                        this.LocalVariable(new SizeRange((BitCount)1, (BitCount)16), offset), state.VmStack.Pop()));
+                    statements.Add(Expression.Assign(
+                        this.LocalVariable(new SizeRange((BitCount)1, (BitCount)16), offset), vmStack.Pop()));
                     break;// One-word load and stores global
                           // Short Load Global Word
                 case OpCodeValue.SLDO_1:
@@ -226,21 +229,21 @@
                         ? ((OpCode.GlobalWord)opCode).Offset
                         : opCode.Id - OpCodeValue.SLDO_1 + 1);
                     type = this.decompiler.Globals[this.method.Unit.Number - 1].MeetAt(offset, new Types.SizeRange((BitCount)1, (BitCount)16));
-                    state.VmStack.Push(Expression.Global(offset, type));
+                    vmStack.Push(Expression.Global(offset, type));
                     break;
                 case OpCodeValue.LAO: // Load Address Global
                     offset = (WordCount)((OpCode.GlobalWord)opCode).Offset;
                     type = this.decompiler.Globals[this.method.Unit.Number - 1].MeetAt(offset, Types.Void.Instance);
-                    state.VmStack.Push(Expression.AddressOf(Expression.Global(offset, type)));
+                    vmStack.Push(Expression.AddressOf(Expression.Global(offset, type)));
                     break;
                 case OpCodeValue.SRO: // Store Global
                     offset = (WordCount)((OpCode.GlobalWord)opCode).Offset;
                     type = this.decompiler.Globals[this.method.Unit.Number - 1].MeetAt(offset, new Types.SizeRange((BitCount)1, (BitCount)16));
-                    this.Statements.Add(Expression.Assign(Expression.Global(offset, type), state.VmStack.Pop()));
+                    statements.Add(Expression.Assign(Expression.Global(offset, type), vmStack.Pop()));
                     break;
 
                 case OpCodeValue.LSA: // Load String Address
-                    state.VmStack.Push(Expression.Constant<Types.String>(((OpCode.ConstantString)opCode).Value));
+                    vmStack.Push(Expression.Constant<Types.String>(((OpCode.ConstantString)opCode).Value));
                     break;
                 case OpCodeValue.ADI:
                 case OpCodeValue.SBI:
@@ -249,15 +252,15 @@
                 case OpCodeValue.MODI:
                 case OpCodeValue.LAND: // Logical And
                 case OpCodeValue.LOR: // Logical Or
-                    tempX = state.VmStack.Pop();
-                    state.VmStack.Push(Expression.BinaryIMath(opCode.Id, state.VmStack.Pop(), tempX));
+                    tempX = vmStack.Pop();
+                    vmStack.Push(Expression.BinaryIMath(opCode.Id, vmStack.Pop(), tempX));
                     break;
                 case OpCodeValue.ADR:
                 case OpCodeValue.SBR:
                 case OpCodeValue.MPR:
                 case OpCodeValue.DVR:
-                    tempX = state.VmStack.Pop();
-                    state.VmStack.Push(Expression.BinaryRMath(opCode.Id, state.VmStack.Pop(), tempX));
+                    tempX = vmStack.Pop();
+                    vmStack.Push(Expression.BinaryRMath(opCode.Id, vmStack.Pop(), tempX));
                     break;
                 case OpCodeValue.NEQI:
                 case OpCodeValue.EQUI:
@@ -265,8 +268,8 @@
                 case OpCodeValue.LESI:
                 case OpCodeValue.GEQI:
                 case OpCodeValue.LEQI:
-                    tempX = state.VmStack.Pop();
-                    state.VmStack.Push(Expression.Compare(opCode.Id - OpCodeValue.EQUI, 0, state.VmStack.Pop(), tempX));
+                    tempX = vmStack.Pop();
+                    vmStack.Push(Expression.Compare(opCode.Id - OpCodeValue.EQUI, 0, vmStack.Pop(), tempX));
                     break;
                 case OpCodeValue.NEQ:
                 case OpCodeValue.EQU:
@@ -274,51 +277,51 @@
                 case OpCodeValue.LES:
                 case OpCodeValue.GEQ:
                 case OpCodeValue.LEQ:
-                    tempX = state.VmStack.Pop();
-                    state.VmStack.Push(Expression.Compare(opCode.Id - OpCodeValue.EQU, ((OpCode.Type)opCode).TypeCode,
-                        state.VmStack.Pop(), tempX));
+                    tempX = vmStack.Pop();
+                    vmStack.Push(Expression.Compare(opCode.Id - OpCodeValue.EQU, ((OpCode.Type)opCode).TypeCode,
+                        vmStack.Pop(), tempX));
                     break;
                 case OpCodeValue.LNOT: // Logical Not
                 case OpCodeValue.NGI: // Negate Integer
                 case OpCodeValue.ABI: // Absolute Value Integer
                 case OpCodeValue.SQI: // Square Integer
-                    state.VmStack.Push(Expression.UnaryIMath(opCode.Id, state.VmStack.Pop()));
+                    vmStack.Push(Expression.UnaryIMath(opCode.Id, vmStack.Pop()));
                     break;
                 case OpCodeValue.NGR: // Negate Real
                 case OpCodeValue.ABR: // Absolute Value Real
                 case OpCodeValue.SQR: // Square Real
-                    state.VmStack.Push(Expression.UnaryRMath(opCode.Id, state.VmStack.Pop()));
+                    vmStack.Push(Expression.UnaryRMath(opCode.Id, vmStack.Pop()));
                     break;
                 case OpCodeValue.FJP:
                     {
                         var jump = (OpCode.Jump)opCode;
-                        this.Statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
+                        statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
                             this.AddressToBlock(jump.Address),
-                            state.VmStack.Pop()));
+                            vmStack.Pop()));
                         break;
                     }
                 case OpCodeValue.EFJ:
                     {
                         var jump = (OpCode.Jump)opCode;
-                        this.Statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
+                        statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
                         this.AddressToBlock(jump.Address),
-                        Expression.Compare(0, 0, state.VmStack.Pop(), state.VmStack.Pop())));
+                        Expression.Compare(0, 0, vmStack.Pop(), vmStack.Pop())));
                         break;
                     }
                 case OpCodeValue.NFJ:
                 {
                     var jump = (OpCode.Jump)opCode;
-                    this.Statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
+                    statements.Add(Expression.If(this.OpIndexToBlock(index + 1),
                         this.AddressToBlock(jump.Address),
-                        Expression.Compare(8, 0, state.VmStack.Pop(), state.VmStack.Pop())));
+                        Expression.Compare(8, 0, vmStack.Pop(), vmStack.Pop())));
                     break;
                     }
                 case OpCodeValue.UJP:
                     break;
                 case OpCodeValue.XJP:
                     var xjp = (OpCode.JumpTable)opCode;
-                    this.Statements.Add(new Case(xjp.Minimum, this.AddressToBlock(xjp.DefaultAddress),
-                        from a in xjp.Addresses select this.AddressToBlock(a), state.VmStack.Pop()));
+                    statements.Add(new Case(xjp.Minimum, this.AddressToBlock(xjp.DefaultAddress),
+                        from a in xjp.Addresses select this.AddressToBlock(a), vmStack.Pop()));
                     break;
                 
                 case OpCodeValue.CBP: // Call Base Procedure - call the main program
@@ -362,8 +365,8 @@
                         var p = new List<Expression>();
                         while ((int)size > 0)
                         {
-                            Debug.Assert(state.VmStack.Count != 0);
-                            var e = state.VmStack.Pop();
+                            Debug.Assert(vmStack.Count != 0);
+                            var e = vmStack.Pop();
                             // ReSharper disable once RedundantCast <- Resharper is wrong
                             size -= (WordCount)e.Type.Size;
                             p.Add(e);
@@ -371,9 +374,9 @@
                         Debug.Assert((int)size == 0);
                         var call = Expression.Call(methodAnalyzer.Signature, p, isExternal);
                         if (call.MethodInfo.ReturnType.ResolvesTo<Types.Void>())
-                            this.Statements.Add(call);
+                            statements.Add(call);
                         else
-                            state.VmStack.Push(call);
+                            vmStack.Push(call);
                     }
                     break;
                 case OpCodeValue.RNP:
@@ -390,8 +393,8 @@
                                 var p = new List<Expression>(3);
                                 var x = 3;
                                 while (x-- > 0)
-                                    p.Insert(0, state.VmStack.Pop());
-                                this.Statements.Add(
+                                    p.Insert(0, vmStack.Pop());
+                                statements.Add(
                                     Expression.Call(Decompiler.MoveLeft, p));
                             }
                             break;
@@ -399,10 +402,10 @@
                             throw new InvalidOperationException();
                         case OpCode.CallStandardProcedure.StandardCall.CSP_XIT:
                             {
-                                var proc = (short)(((Constant)state.VmStack.Pop()).Value ?? -1);
-                                var unitNumber = (short)(((Constant)state.VmStack.Pop()).Value ?? -1);
+                                var proc = (short)(((Constant)vmStack.Pop()).Value ?? -1);
+                                var unitNumber = (short)(((Constant)vmStack.Pop()).Value ?? -1);
                                 var site = this.decompiler.GetMethod(unitNumber, proc);
-                                this.Statements.Add(new Exit(site.method.Unit.Name, proc));
+                                statements.Add(new Exit(site.method.Unit.Name, proc));
                             }
                             break;
                         case OpCode.CallStandardProcedure.StandardCall.CSP_UREAD:
@@ -411,8 +414,8 @@
                                 var p = new List<Expression>(6);
                                 var x = 6;
                                 while (x-- > 0)
-                                    p.Insert(0, state.VmStack.Pop());
-                                this.Statements.Add(
+                                    p.Insert(0, vmStack.Pop());
+                                statements.Add(
                                     Expression.Call(
                                         subType == OpCode.CallStandardProcedure.StandardCall.CSP_UREAD
                                             ? Decompiler.UnitRead
@@ -428,8 +431,8 @@
                                 var p = new List<Expression>(4);
                                 var x = 4;
                                 while (x-- > 0)
-                                    p.Insert(0, state.VmStack.Pop());
-                                this.Statements.Add(
+                                    p.Insert(0, vmStack.Pop());
+                                statements.Add(
                                     Expression.Call(Decompiler.FillChar, p));
                             }
                             break;
@@ -450,19 +453,19 @@
                         case OpCode.CallStandardProcedure.StandardCall.CSP_MRK:
                             {
                                 var p = new Expression[1];
-                                p[0] = state.VmStack.Pop();
-                                this.Statements.Add(Expression.Call(Decompiler.Mark, p));
+                                p[0] = vmStack.Pop();
+                                statements.Add(Expression.Call(Decompiler.Mark, p));
                             }
                             break;
                         case OpCode.CallStandardProcedure.StandardCall.CSP_RLS:
                             {
                                 var p = new Expression[1];
-                                p[0] = state.VmStack.Pop();
-                                this.Statements.Add(Expression.Call(Decompiler.Release, p));
+                                p[0] = vmStack.Pop();
+                                statements.Add(Expression.Call(Decompiler.Release, p));
                             }
                             break;
                         case OpCode.CallStandardProcedure.StandardCall.CSP_IOR:
-                            state.VmStack.Push(Expression.Call(Decompiler.Ioresult, new Expression[0]));
+                            vmStack.Push(Expression.Call(Decompiler.Ioresult, new Expression[0]));
                             break;
                         case OpCode.CallStandardProcedure.StandardCall.CSP_UBUSY:
                         case OpCode.CallStandardProcedure.StandardCall.CSP_POT:
@@ -471,14 +474,14 @@
                         case OpCode.CallStandardProcedure.StandardCall.CSP_UCLEAR:
                             {
                                 var p = new Expression[1];
-                                p[0] = state.VmStack.Pop();
-                                this.Statements.Add(Expression.Call(Decompiler.Uclear, p));
+                                p[0] = vmStack.Pop();
+                                statements.Add(Expression.Call(Decompiler.Uclear, p));
                             }
                             break;
                         case OpCode.CallStandardProcedure.StandardCall.CSP_HLT:
                             throw new InvalidOperationException();
                         case OpCode.CallStandardProcedure.StandardCall.CSP_MAV:
-                            state.VmStack.Push(Expression.Call(Decompiler.Ioresult, new Expression[0]));
+                            vmStack.Push(Expression.Call(Decompiler.Ioresult, new Expression[0]));
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();
