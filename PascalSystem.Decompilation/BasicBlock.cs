@@ -13,6 +13,7 @@
         public int StartIndex { get; }
         public int EndIndex { get; private set; }
         public string Label { get; }
+        public BasicBlock? ContinuesWith { get; set; }
 
         public BasicBlock(MethodAnalyzer methodAnalyzer, int id, int startIndex, int endIndex)
             : this(methodAnalyzer.Signature.Name, methodAnalyzer, id, startIndex, endIndex) { }

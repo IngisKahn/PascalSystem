@@ -7,6 +7,7 @@
     using System.Diagnostics;
     using System.Linq;
     using System.Threading.Tasks;
+    using System.Xml.Linq;
     using Expressions;
     using Model;
     using Types;
@@ -127,6 +128,108 @@
                         break;
                 }
 
+            DominatorData[] data = this.BlockList.Select(_ => new DominatorData()).ToArray();
+            var n = 0;
+            void Dfs(int v)
+            {
+                var vData = data[v];
+                vData.Semi = ++n;
+                data[n].Vertex = vData.Label = v;
+                foreach (var w in this.BlockList[v].EdgesOut.Select(e => e.Destination.Id))
+                {
+                    var wData = data[w];
+                    if (wData.Semi == 0)
+                    {
+                        wData.Parent = v;
+                        Dfs(w);
+                    }
+
+                    wData.Pred.Add(v);
+                }
+            }
+
+            Dfs(0);
+
+            void Compress(int v)
+            {
+                var vData = data[v];
+                if (data[vData.Ancestor].Ancestor == 0)
+                    return;
+                Compress(vData.Ancestor);
+                if (data[data[vData.Ancestor].Label].Semi < data[vData.Label].Semi)
+                    vData.Label = data[vData.Ancestor].Label;
+                vData.Ancestor = data[vData.Ancestor].Ancestor;
+            }
+
+            int Eval(int v)
+            {
+                var vData = data[v];
+                return vData.Ancestor == 0
+                    ? vData.Label
+                    : data[data[vData.Ancestor].Label].Semi >= data[vData.Label].Semi
+                        ? vData.Label
+                        : data[vData.Ancestor].Label;
+            }
+
+            void Link(int v, int w)
+            {
+                var s = w;
+                var vData = data[v];
+                var wData = data[w];
+                while (data[wData.Label].Semi < data[data[data[s].Child].Label].Semi)
+                    if (data[s].Size + data[data[data[s].Child].Child].Size >= 2 * data[data[s].Child].Size)
+                    {
+                        data[data[s].Child].Ancestor = s;
+                        data[s].Child = data[data[s].Child].Child;
+                    }
+                    else
+                    {
+                        data[data[s].Child].Size = data[s].Size;
+                        s = data[s].Ancestor = data[s].Child;
+                    }
+
+                data[s].Label = wData.Label;
+                vData.Size += wData.Size;
+                if (vData.Size < 2 * wData.Size)
+                {
+                    var t = s;
+                    s = vData.Child;
+                    vData.Child = t;
+                }
+
+                while (s != 0)
+                {
+                    data[s].Ancestor = v;
+                    s = data[s].Child;
+                }
+            }
+
+            var dom = new int[this.BlockList.Count];
+            for (var i = n; i > 2; i--)
+            {
+                var w = data[i].Vertex;
+                var wData = data[w];
+                foreach (var uData in wData.Pred.Select(v => data[Eval(v)])
+                                                .Where(uData => uData.Semi < wData.Semi))
+                    wData.Semi = uData.Semi;
+
+                data[data[wData.Semi].Vertex].Bucket.Add(w);
+                Link(wData.Parent, w);
+                foreach (var v in data[wData.Parent].Bucket)
+                {
+                    data[wData.Parent].Bucket.Remove(v);
+                    var u = Eval(v);
+                    dom[v] = data[u].Semi < data[v].Semi ? u : wData.Parent;
+                }
+            }
+
+            for (var i = 2; i < n; i++)
+            {
+                var w = data[i].Vertex;
+                if (dom[w] != data[data[w].Semi].Vertex)
+                    dom[w] = dom[dom[w]];
+            }
+
             // re number
             for (var i = 0; i < this.BlockList.Count; i++)
             {
@@ -151,6 +254,19 @@
                 foreach (var controlEdge in from controlEdge in currentBlock.EdgesOut where !visited[controlEdge.Destination.Id] select controlEdge)
                     stateQueue.Enqueue(new(controlEdge.Destination, new(vmStack)));
             }
+        }
+
+        private class DominatorData
+        {
+            public int Parent { get; set; }
+            public int Ancestor { get; set; }
+            public int Child { get; set; }
+            public int Vertex { get; set; }
+            public int Label { get; set; }
+            public int Semi { get; set; }
+            public int Size { get; set; } = 1;
+            public HashSet<int> Pred { get; } = new();
+            public HashSet<int> Bucket { get; } = new();
         }
 
         private void Decompile(OpCode opCode, int index, List<Expression> statements, Stack<Expression> vmStack)
