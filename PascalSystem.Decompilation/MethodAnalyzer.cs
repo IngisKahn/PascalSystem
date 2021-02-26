@@ -13,6 +13,11 @@
     using Types;
     using Void = Types.Void;
 
+    public class CodeBlock
+    {
+
+    }
+
     public class MethodAnalyzer : IEnumerable<BasicBlock>
     {
         private readonly Model.Method method;
@@ -23,6 +28,8 @@
         public int ParentId { get; set; } = -1;
         public HashSet<int> ChildIds { get; } = new();
         public bool IsFunction => this.Signature.IsFunction;
+
+        private readonly Stack<CodeBlock> codeBlockStack = new();
 
         public MethodAnalyzer(Decompiler decompiler, Model.Method method)
         {
@@ -127,6 +134,48 @@
                         this.Split(index, index + 1, false);
                         break;
                 }
+
+            Queue<DecompilerState> stateQueue = new();
+            stateQueue.Enqueue(new(this.BlockList[0], new()));
+            var visited = new bool[this.BlockList.Count];
+            visited[0] = true;
+            while (stateQueue.Count > 0)
+            {
+                var (currentBlock, vmStack) = stateQueue.Dequeue();
+                for (var i = currentBlock.StartIndex; i <= currentBlock.EndIndex && i < opCodes.Count; i++)
+                {
+                    var opCode = opCodes[i];
+                    this.Decompile(opCode, i, currentBlock.Statements, vmStack);
+                }
+
+                foreach (var controlEdge in from controlEdge in currentBlock.EdgesOut
+                    where !visited[controlEdge.Destination.Id]
+                    select controlEdge)
+                {
+                    visited[controlEdge.Destination.Id] = true;
+                    stateQueue.Enqueue(new(controlEdge.Destination, new(vmStack)));
+                }
+            }
+
+            // merge any single edges (superfolous unconditional jumps)
+            Stack<BasicBlock> blockStack = new();
+            blockStack.Push(this.BlockList[0]);
+            while (blockStack.Count > 0)
+            {
+                var current = blockStack.Pop();
+                while (current.EdgesOut.Count == 1 && current.EdgesOut[0].Destination.EdgesIn.Count == 1)
+                {
+                    var next = current.EdgesOut[0].Destination;
+                    current.Statements.AddRange(next.Statements);
+                    current.EdgesOut = next.EdgesOut;
+                    foreach (var edge in current.EdgesOut)
+                        edge.Source = current;
+                    current = next;
+                }
+
+                foreach (var block in current.EdgesOut.Where(e => !e.IsBack).Select(e => e.Destination))
+                    blockStack.Push(block);
+            }
 
             // re number
             for (var i = 0; i < this.BlockList.Count; i++)
@@ -243,23 +292,6 @@
                 var d = dom[i];
                 if (d != i)
                     this.BlockList[d].Dominates.Add(this.BlockList[i]);
-            }
-
-            Queue<DecompilerState> stateQueue = new();
-            stateQueue.Enqueue(new(this.BlockList[0], new()));
-            var visited = new bool[this.BlockList.Count];
-            while (stateQueue.Count > 0)
-            {
-                var (currentBlock, vmStack) = stateQueue.Dequeue();
-                visited[currentBlock.Id] = true;
-                for (var i = currentBlock.StartIndex; i <= currentBlock.EndIndex; i++)
-                {
-                    var opCode = opCodes[i];
-                    this.Decompile(opCode, i, currentBlock.Statements, vmStack);
-                }
-
-                foreach (var controlEdge in from controlEdge in currentBlock.EdgesOut where !visited[controlEdge.Destination.Id] select controlEdge)
-                    stateQueue.Enqueue(new(controlEdge.Destination, new(vmStack)));
             }
         }
 
@@ -422,10 +454,9 @@
                         var jump = (OpCode.Jump)opCode;
                         var jumpToBlock = this.AddressToBlock(jump.Address);
                         var nextBlock = this.OpIndexToBlock(index + 1);
-                        statements.Add(Expression.If(nextBlock,
+                        statements.Add(Expression.If( this.OpIndexToBlock(index), nextBlock,
                             jumpToBlock,
-                            vmStack.Pop(),
-                                      jumpToBlock.Id > nextBlock.Id && jumpToBlock.EdgesIn.All(e => e.Source.Id != e.Destination.Id - 1)));
+                            vmStack.Pop()));
                         break;
                     }
                 case OpCodeValue.EFJ:
@@ -433,11 +464,9 @@
                         var jump = (OpCode.Jump)opCode;
                         var jumpToBlock = this.AddressToBlock(jump.Address);
                         var nextBlock = this.OpIndexToBlock(index + 1);
-                        statements.Add(Expression.If(nextBlock,
+                        statements.Add(Expression.If(this.OpIndexToBlock(index), nextBlock,
                             jumpToBlock,
-                            Expression.Compare(0, 0, vmStack.Pop(), vmStack.Pop()),
-                            jumpToBlock.Id > nextBlock.Id &&
-                            jumpToBlock.EdgesIn.All(e => e.Source.Id != e.Destination.Id - 1)));
+                            Expression.Compare(0, 0, vmStack.Pop(), vmStack.Pop())));
                         break;
                     }
                 case OpCodeValue.NFJ:
@@ -445,11 +474,9 @@
                     var jump = (OpCode.Jump)opCode;
                     var jumpToBlock = this.AddressToBlock(jump.Address);
                     var nextBlock = this.OpIndexToBlock(index + 1);
-                    statements.Add(Expression.If(nextBlock,
+                    statements.Add(Expression.If(this.OpIndexToBlock(index), nextBlock,
                         jumpToBlock,
-                        Expression.Compare(8, 0, vmStack.Pop(), vmStack.Pop()),
-                        jumpToBlock.Id > nextBlock.Id &&
-                        jumpToBlock.EdgesIn.All(e => e.Source.Id != e.Destination.Id - 1)));
+                        Expression.Compare(8, 0, vmStack.Pop(), vmStack.Pop())));
                     break;
                     }
                 case OpCodeValue.UJP:
@@ -627,6 +654,24 @@
                     //throw new DecompilationException("Invalid Op Code: " + opCode.Id);
                     return;
             }
+        }
+
+        private void Jump(OpCode.Jump jump, int index, List<Expression> statements, Expression test)
+        {
+            var currentBlock = this.OpIndexToBlock(index);
+            var jumpToBlock = this.AddressToBlock(jump.Address);
+            var nextBlock = this.OpIndexToBlock(index + 1);
+            //if (currentBlock.Dominates.Count > 1)
+                statements.Add(Expression.If(currentBlock, nextBlock,
+                    jumpToBlock,
+                    test));
+            //else
+            //{
+            //    List<Expression> loopStatements = new(statements);
+            //    statements.Clear();
+            //    throw new NotImplementedException();
+            //    //statements.Add(Expression.Repeat(loopStatements, test, nextBlock));
+            //}
         }
 
         private Expression LocalVariable(Base type, WordCount offset)

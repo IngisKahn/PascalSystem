@@ -28,7 +28,7 @@
         }
         public int Length => this.EndIndex - this.StartIndex + 1;
 
-        public List<ControlEdge> EdgesOut { get; private init; } = new();
+        public List<ControlEdge> EdgesOut { get; set; } = new();
 
         public List<ControlEdge> EdgesIn { get; } = new();
         public List<Expression> Statements { get; } = new();
@@ -95,16 +95,23 @@
             }
         }
 
-        public async Task Dump(IndentedTextWriter writer)
+        public async Task Dump(IndentedTextWriter writer, bool indent = true)
         {
-            if (this.Statements.Count > 1)
-                await writer.WriteLineAsync("BEGIN");
-            writer.Indent++;
+            if (indent)
+            {
+                if (this.Statements.Count > 1)
+                    await writer.WriteLineAsync("BEGIN");
+                writer.Indent++;
+            }
+
             foreach (var statement in this.Statements)
                 await statement.Dump(writer);
-            writer.Indent--; 
-            if (this.Statements.Count > 1)
-                await writer.WriteLineAsync("END; {" + this.Label + "}");
+            if (indent)
+            {
+                writer.Indent--;
+                if (this.Statements.Count > 1)
+                    await writer.WriteLineAsync("END; {" + this.Label + "}");
+            }
         }
         public override string ToString() => $"BB{this.Id}: Size:{this.Length} "
                                              + $"In:[{string.Join(", ", this.EdgesIn.Select(ce => ce.Source.Id.ToString(CultureInfo.InvariantCulture)))}] "
