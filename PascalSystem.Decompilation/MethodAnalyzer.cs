@@ -13,10 +13,6 @@
     using Types;
     using Void = Types.Void;
 
-    public class CodeBlock
-    {
-
-    }
 
     public class MethodAnalyzer : IEnumerable<BasicBlock>
     {
@@ -132,6 +128,8 @@
                     case OpCode.Exit:
                         // split with no edge
                         this.Split(index, index + 1, false);
+                        // pretend we jump to exit op - this false edge is needed for post dominator calculation
+                        this.Split(index, opCodes.Count - 1);
                         break;
                 }
 
@@ -185,8 +183,39 @@
                 //block.Address = this.opIndexToAddress[block.StartIndex];
             }
 
-            DominatorData[] data = this.BlockList.Select(_ => new DominatorData()).ToArray();
+            var dom = this.ComputeImmediateDominators(this.BlockList.Count, 0, n => this.BlockList[n].EdgesOut);
+            var pdom = this.ComputeImmediateDominators(this.BlockList.Count, this.BlockList.Count - 1, n => this.BlockList[n].EdgesIn);
+
+            for (var i = 0; i < dom.Length; i++)
+            {
+                var d = dom[i];
+                if (d != i)
+                {
+                    this.BlockList[d].Dominates.Add(this.BlockList[i]);
+                    this.BlockList[i].ImmediateDominator = this.BlockList[d];
+                }
+                d = pdom[i];
+                if (d == i)
+                    continue;
+                this.BlockList[d].PostDominates.Add(this.BlockList[i]);
+                this.BlockList[i].ImmediatePostDominator = this.BlockList[d];
+
+            }
+
+            Stack<CodeBlock> codeStack = new();
+            codeStack.Push(new(0));
+            while (codeStack.Count > 0)
+            {
+                var current = codeStack.Pop();
+                var entry = this.BlockList[current.CurrentBlock];
+            }
+        }
+
+        private int[] ComputeImmediateDominators(int nodeCount, int startNode, Func<int, IEnumerable<BasicBlock.ControlEdge>> getEdges)
+        {
+            DominatorData[] data = Enumerable.Range(0, nodeCount).Select(_ => new DominatorData()).ToArray();
             var n = -1;
+
             void Dfs(int v)
             {
                 var vData = data[v];
@@ -205,7 +234,7 @@
                 }
             }
 
-            Dfs(0);
+            Dfs(startNode);
 
             void Compress(int v)
             {
@@ -221,11 +250,12 @@
             int Eval(int v)
             {
                 var vData = data[v];
-                return vData.Ancestor == 0
+                if (vData.Ancestor == 0)
+                    return vData.Label;
+                Compress(v);
+                return data[data[vData.Ancestor].Label].Semi >= data[vData.Label].Semi
                     ? vData.Label
-                    : data[data[vData.Ancestor].Label].Semi >= data[vData.Label].Semi
-                        ? vData.Label
-                        : data[vData.Ancestor].Label;
+                    : data[vData.Ancestor].Label;
             }
 
             void Link(int v, int w)
@@ -267,7 +297,7 @@
                 var w = data[i].Vertex;
                 var wData = data[w];
                 foreach (var uData in wData.Pred.Select(v => data[Eval(v)])
-                                                .Where(uData => uData.Semi < wData.Semi))
+                    .Where(uData => uData.Semi < wData.Semi))
                     wData.Semi = uData.Semi;
 
                 data[data[wData.Semi].Vertex].Bucket.Add(w);
@@ -287,12 +317,19 @@
                     dom[w] = dom[dom[w]];
             }
 
-            for (var i = 0; i < dom.Length; i++)
-            {
-                var d = dom[i];
-                if (d != i)
-                    this.BlockList[d].Dominates.Add(this.BlockList[i]);
-            }
+            return dom;
+        }
+
+        public enum CodeBlockType
+        {
+            Unknown,
+            Begin,
+            Indented
+        }
+        public class CodeBlock
+        {
+            public int CurrentBlock { get; set; }
+            public CodeBlock(int currentBlock) => this.CurrentBlock = currentBlock;
         }
 
         private class DominatorData

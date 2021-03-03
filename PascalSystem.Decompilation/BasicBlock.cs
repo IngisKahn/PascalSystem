@@ -1,5 +1,6 @@
 ﻿namespace PascalSystem.Decompilation
 {
+    using System;
     using System.CodeDom.Compiler;
     using System.Collections.Generic;
     using System.Globalization;
@@ -14,7 +15,10 @@
         public int StartIndex { get; }
         public int EndIndex { get; private set; }
         public string Label { get; }
+        public BasicBlock? ImmediateDominator { get; set; }
         public List<BasicBlock> Dominates { get; } = new();
+        public BasicBlock? ImmediatePostDominator { get; set; }
+        public List<BasicBlock> PostDominates { get; } = new();
 
         public BasicBlock(MethodAnalyzer methodAnalyzer, int id, int startIndex, int endIndex)
             : this(methodAnalyzer.Signature.Name, methodAnalyzer, id, startIndex, endIndex) { }
@@ -32,6 +36,29 @@
 
         public List<ControlEdge> EdgesIn { get; } = new();
         public List<Expression> Statements { get; } = new();
+
+        private BasicBlock EitherCommonImmediateDominator(BasicBlock other, Func<BasicBlock, BasicBlock?> dominator)
+        {
+            var current = this;
+            HashSet<int> dominators = new();
+            HashSet<int> otherDominators = new();
+            for (;;)
+            {
+                dominators.Add(current.Id);
+                otherDominators.Add(other.Id);
+                if (otherDominators.Contains(current.Id))
+                    return current;
+                current = dominator(current) ?? current;
+                if (dominators.Contains(other.Id))
+                    return other;
+                other = dominator(other) ?? other;
+            }
+        }
+
+        public BasicBlock CommonImmediateDominator(BasicBlock other) =>
+            this.EitherCommonImmediateDominator(other, bb => bb.ImmediateDominator);
+        public BasicBlock CommonImmediatePostDominator(BasicBlock other) =>
+            this.EitherCommonImmediateDominator(other, bb => bb.ImmediatePostDominator);
 
         //public override int GetHashCode() => this.Id;
 
