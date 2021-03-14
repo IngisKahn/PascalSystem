@@ -14,26 +14,26 @@
             this.TrueBlock = trueBlock;
             this.FalseBlock = falseBlock;
             this.Expression = expression;
-
-            switch (parent.Dominates.Count)
-            {
-                case 2:
-                    this.NextBlock = falseBlock;
-                    break;
-                case 3:
-                    this.HasElse = true;
-                    this.NextBlock = parent.Dominates.First(d => d != trueBlock && d != falseBlock);
-                    break;
-                default:
-                    throw new DecompilationException();
-            }
+            //this.HasElse = this.TrueBlock.CommonImmediatePostDominator(this.FalseBlock) != this.FalseBlock;
+            //switch (parent.Dominates.Count)
+            //{
+            //    case 2:
+            //        this.NextBlock = falseBlock;
+            //        break;
+            //    case 3:
+            //        this.HasElse = true;
+            //        this.NextBlock = parent.Dominates.First(d => d != trueBlock && d != falseBlock);
+            //        break;
+            //    default:
+            //        throw new DecompilationException();
+            //}
         }
 
-        public BasicBlock TrueBlock { get; }
-        public BasicBlock FalseBlock { get; }
+        public BasicBlock TrueBlock { get; set; }
+        public BasicBlock FalseBlock { get; set; }
         public BasicBlock NextBlock { get; }
         public Expression Expression { get; }
-        public bool HasElse { get; }
+        //public bool HasElse { get; }
 
         internal override void BuildString(StringBuilder builder)
         {
@@ -49,12 +49,12 @@
             await writer.WriteLineAsync(" THEN");
             //await WriteChildren("IF", this.TrueBlock.Statements, writer);
             await this.TrueBlock.Dump(writer);
-            if (this.HasElse)
-            {
-                await writer.WriteLineAsync("ELSE");
-                //await WriteChildren("ELSE", this.FalseBlock, writer);
-                await this.FalseBlock.Dump(writer);
-            }
+            //if (this.HasElse)
+            //{
+            //    await writer.WriteLineAsync("ELSE");
+            //    //await WriteChildren("ELSE", this.FalseBlock, writer);
+            //    await this.FalseBlock.Dump(writer);
+            //}
 
             await this.NextBlock.Dump(writer, false);
             //else

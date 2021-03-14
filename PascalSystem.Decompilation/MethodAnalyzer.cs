@@ -5,6 +5,7 @@
     using System.Collections;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Threading.Tasks;
     using System.Xml.Linq;
@@ -20,7 +21,7 @@
         public MethodSignature Signature { get; }
         private readonly Decompiler decompiler;
         private bool decompiled;
-        private Dictionary<int, int> opAddressToIndex = new();
+        private readonly Dictionary<int, int> opAddressToIndex = new();
         public int ParentId { get; set; } = -1;
         public HashSet<int> ChildIds { get; } = new();
         public bool IsFunction => this.Signature.IsFunction;
@@ -52,6 +53,7 @@
 
         private BasicBlock OpIndexToBlock(int index) => this.BlockList[this.blockIndexes?[index] ?? throw new DecompilationException()];
         private BasicBlock AddressToBlock(int address) => this.OpIndexToBlock(this.opAddressToIndex[address]);
+
         private void Split(int fromIndex, int toIndex, bool addEdge = true)
         {
             if (this.blockIndexes is null || toIndex >= this.blockIndexes.Length)
@@ -92,14 +94,14 @@
 
 
             this.BlockList.Add(new(this, 0, 0, opCodes.Count));
-            
+
             // map the addresses
             for (int i = 0, address = 0; i < opCodes.Count; address += opCodes[i++].Length)
             {
                 this.opAddressToIndex[address] = i;
                 this.opIndexToAddress[i] = address;
             }
-            
+
             // split blocks
             for (var index = 0; index < opCodes.Count; index++)
                 switch (opCodes[index])
@@ -114,7 +116,7 @@
                             break;
                         // add edge if fall thru from pre target
                         var preTarget = opCodes[target - 1];
-                        if (preTarget is OpCode.Jump {IsConditional: true}
+                        if (preTarget is OpCode.Jump { IsConditional: false }
                             || preTarget is OpCode.JumpTable || preTarget is OpCode.Exit)
                             break;
                         this.OpIndexToBlock(target - 1).AddEdge(this.OpIndexToBlock(target));
@@ -147,33 +149,79 @@
                 }
 
                 foreach (var controlEdge in from controlEdge in currentBlock.EdgesOut
-                    where !visited[controlEdge.Destination.Id]
-                    select controlEdge)
+                                            where !visited[controlEdge.Destination.Id]
+                                            select controlEdge)
                 {
                     visited[controlEdge.Destination.Id] = true;
                     stateQueue.Enqueue(new(controlEdge.Destination, new(vmStack)));
                 }
             }
 
-            // merge any single edges (superfolous unconditional jumps)
+            // merge any single edges (superfluous unconditional jumps)
             Stack<BasicBlock> blockStack = new();
             blockStack.Push(this.BlockList[0]);
             while (blockStack.Count > 0)
             {
                 var current = blockStack.Pop();
-                while (current.EdgesOut.Count == 1 && current.EdgesOut[0].Destination.EdgesIn.Count == 1)
+
+                if (current.Statements.Count == 0 && current.EdgesOut.Count != 0) // this can only be a UJP
+                {
+                    current.Id = -1; // mark for death
+                    var exitEdge = current.EdgesOut.Single();
+
+                    var exit = exitEdge.Destination;
+
+                    exit.EdgesIn.Remove(exitEdge);
+
+
+                    foreach (var controlEdge in current.EdgesIn)
+                    {
+                        controlEdge.Destination = exit;
+                        exit.EdgesIn.Add(controlEdge);
+                        switch (controlEdge.Source.Statements.Last())
+                        {
+                            case If ifStatement:
+                                if (ifStatement.TrueBlock == current)
+                                    ifStatement.TrueBlock = exit;
+                                else
+                                    ifStatement.FalseBlock = exit;
+                                break;
+                            case Case caseStatement:
+                                caseStatement.ReplaceBlock(current, exit);
+                                break;
+                        }
+
+                    }
+
+                    if (!exitEdge.IsBack)
+                        blockStack.Push(exit);
+
+                    continue;
+                }
+
+                while (current.EdgesOut.Count == 1)
                 {
                     var next = current.EdgesOut[0].Destination;
-                    current.Statements.AddRange(next.Statements);
-                    current.EdgesOut = next.EdgesOut;
-                    foreach (var edge in current.EdgesOut)
-                        edge.Source = current;
-                    current = next;
+                    if (next.EdgesIn.Count == 1) // one way in, just tack it on
+                    {
+                        current.Statements.AddRange(next.Statements);
+                        current.EdgesOut = next.EdgesOut;
+                        foreach (var edge in current.EdgesOut)
+                            edge.Source = current;
+                        next.Id = -1; // mark for death
+                    }
+                    else
+                        break;
                 }
 
                 foreach (var block in current.EdgesOut.Where(e => !e.IsBack).Select(e => e.Destination))
                     blockStack.Push(block);
             }
+
+            // remove skipped
+            var temp = this.BlockList.ToArray();
+            this.BlockList.Clear();
+            this.BlockList.AddRange(temp.Where(b => b.Id >= 0));
 
             // re number
             for (var i = 0; i < this.BlockList.Count; i++)
@@ -183,8 +231,11 @@
                 //block.Address = this.opIndexToAddress[block.StartIndex];
             }
 
-            var dom = this.ComputeImmediateDominators(this.BlockList.Count, 0, n => this.BlockList[n].EdgesOut);
-            var pdom = this.ComputeImmediateDominators(this.BlockList.Count, this.BlockList.Count - 1, n => this.BlockList[n].EdgesIn);
+            var dom = this.ComputeImmediateDominators(this.BlockList.Count, i => this.BlockList[i].EdgesOut, e => e.Destination.Id);
+            List<BasicBlock> reverse = new(this.BlockList);
+            reverse.Reverse();
+            var pdom = this.ComputeImmediateDominators(this.BlockList.Count, i => reverse[i].EdgesIn, e => this.BlockList.Count - e.Source.Id - 1);
+            pdom = pdom.Reverse().Select(d => this.BlockList.Count - d - 1).ToArray();
 
             for (var i = 0; i < dom.Length; i++)
             {
@@ -201,19 +252,12 @@
                 this.BlockList[i].ImmediatePostDominator = this.BlockList[d];
 
             }
-
-            Stack<CodeBlock> codeStack = new();
-            codeStack.Push(new(0));
-            while (codeStack.Count > 0)
-            {
-                var current = codeStack.Pop();
-                var entry = this.BlockList[current.CurrentBlock];
-            }
         }
 
-        private int[] ComputeImmediateDominators(int nodeCount, int startNode, Func<int, IEnumerable<BasicBlock.ControlEdge>> getEdges)
+        private int[] ComputeImmediateDominators(int count, Func<int, IEnumerable<BasicBlock.ControlEdge>> getEdges,
+            Func<BasicBlock.ControlEdge, int> followEdge)
         {
-            DominatorData[] data = Enumerable.Range(0, nodeCount).Select(_ => new DominatorData()).ToArray();
+            DominatorData[] data = Enumerable.Range(0, count).Select(_ => new DominatorData()).ToArray();
             var n = -1;
 
             void Dfs(int v)
@@ -221,8 +265,10 @@
                 var vData = data[v];
                 vData.Semi = ++n;
                 data[n].Vertex = vData.Label = v;
-                foreach (var w in this.BlockList[v].EdgesOut.Select(e => e.Destination.Id))
+                foreach (var w in getEdges(v).Select(followEdge))
                 {
+                    //if (w >= count)
+                    //    continue;
                     var wData = data[w];
                     if (wData.Semi == 0)
                     {
@@ -234,7 +280,7 @@
                 }
             }
 
-            Dfs(startNode);
+            Dfs(0);
 
             void Compress(int v)
             {
@@ -292,7 +338,7 @@
             }
 
             var dom = new int[this.BlockList.Count];
-            for (var i = n; i > 2; i--)
+            for (var i = n; i > 1; i--)
             {
                 var w = data[i].Vertex;
                 var wData = data[w];
@@ -310,7 +356,7 @@
                 }
             }
 
-            for (var i = 2; i < n; i++)
+            for (var i = 1; i < n; i++)
             {
                 var w = data[i].Vertex;
                 if (dom[w] != data[data[w].Semi].Vertex)
@@ -322,14 +368,175 @@
 
         public enum CodeBlockType
         {
-            Unknown,
-            Begin,
-            Indented
+            /// <summary>
+            /// This block only needs BEGIN/END if it has more than one statment
+            /// </summary>
+            Open,
+            /// <summary>
+            /// This block needs BEGIN/END - it is top level or it is an ambiguous IF/ELSE
+            /// </summary>
+            Fixed,
+            /// <summary>
+            /// This block does not need BEGIN/END
+            /// </summary>
+            Closed
         }
         public class CodeBlock
         {
-            public int CurrentBlock { get; set; }
-            public CodeBlock(int currentBlock) => this.CurrentBlock = currentBlock;
+            public BasicBlock StartBlock { get; set; }
+            public BasicBlock? ExitBlock { get; set; }
+            public string Label { get; }
+            private CodeBlockType type;
+            public int LoopLevel { get; }
+
+            /// <summary>
+            /// Create a code block from an initial Basic Block
+            /// </summary>
+            /// <param name="startBlock"></param>
+            /// <param name="type">This block needs a BEGIN/END around it if it has more than one statement</param>
+            /// <param name="loopLevel"></param>
+            public CodeBlock(string label, BasicBlock startBlock, CodeBlockType type = CodeBlockType.Open, int loopLevel = 0)
+            {
+                this.Label = label;
+                this.StartBlock = startBlock;
+                this.type = type;
+                this.LoopLevel = loopLevel;
+            }
+            public CodeBlock(string label, BasicBlock startBlock, BasicBlock exitBlock, CodeBlockType type = CodeBlockType.Open, int loopLevel = 0) : this(label, startBlock, type, loopLevel)
+                => this.ExitBlock = exitBlock;
+
+            public async Task Dump(IndentedTextWriter writer)
+            {
+                var currentBlock = this.StartBlock;
+                var emitBeginEnd = false;
+                var first = true;
+
+
+                do // foreach basic block in this level
+                {
+                    // is the current block the start of a loop?
+                    // if there are any back edges in, order them by outter to inner
+                    var loopsIn = currentBlock.EdgesIn.Where(e => e.IsBack)
+                                                                 .OrderBy(e => e, Comparer<BasicBlock.ControlEdge>.Create((a, b) =>
+                                                                {
+                                                                    if (!a.IsConditional)
+                                                                        return -1;
+                                                                    if (!b.IsConditional)
+                                                                        return 1;
+                                                                    var post = a.Source.CommonImmediatePostDominator(b.Source);
+                                                                    return a.Source == post ? 1 : b.Source == post ? -1 : 0;
+                                                                }))
+                                                                 .ToArray();
+                    var loopLevel = first ? this.LoopLevel : 0;
+                    if (loopsIn.Length > loopLevel) // we are starting a loop
+                    {
+                        var loopExit = loopsIn[loopLevel];
+
+                        if (this.type != CodeBlockType.Closed && first && loopExit.Destination != this.ExitBlock)
+                        {
+                            first = false;
+                            emitBeginEnd = true;
+                            await writer.WriteLineAsync("BEGIN");
+                            writer.Indent++;
+                        }
+
+                        CodeBlock inner;
+                        if (loopExit.IsConditional)
+                        {
+
+                            await writer.WriteLineAsync("REPEAT");
+                            inner = new("REPEAT", currentBlock, loopExit.Source.ImmediatePostDominator ?? throw new InvalidOperationException(), CodeBlockType.Closed, loopLevel + 1);
+                            //writer.Indent++;
+                            await inner.Dump(writer);
+                            //writer.Indent--;
+                            await writer.WriteAsync("UNTIL ");
+                            await ((If)loopExit.Source.Statements.Last()).Expression.DumpLine(writer);
+                        }
+                        else
+                        {
+                            await writer.WriteAsync("WHILE ");
+                            await ((If)currentBlock.Statements.Single()).Expression.DumpLine(writer);
+                            await writer.WriteLineAsync(" DO");
+                            inner = new("WHILE", currentBlock, loopExit.Source.ImmediatePostDominator ?? throw new InvalidOperationException(), CodeBlockType.Open, loopLevel + 1);
+                            writer.Indent++;
+                            await inner.Dump(writer);
+                            writer.Indent--;
+                            await writer.WriteLineAsync("END {WHILE}");
+
+                        }
+                        currentBlock = loopExit.Source.ImmediatePostDominator;
+                    }
+
+                    if (first)
+                    {
+                        if (this.type != CodeBlockType.Closed)
+                            if (this.type == CodeBlockType.Fixed || currentBlock.Statements.Count > 1 ||
+                                currentBlock.ImmediatePostDominator != this.ExitBlock)
+                            {
+                                emitBeginEnd = true;
+                                await writer.WriteLineAsync("BEGIN");
+                            }
+                        writer.Indent++;
+                    }
+
+                    first = false;
+
+                    BasicBlock? next = null;
+
+                    foreach (var statement in currentBlock.Statements)
+                    {
+                        switch (statement)
+                        {
+                            case If s:
+                                if (currentBlock.EdgesOut.Any(e => e.IsBack))
+                                    continue;
+                                await writer.WriteAsync("IF ");
+                                await s.Expression.Dump(writer);
+                                await writer.WriteLineAsync(" THEN");
+                                var exit = s.TrueBlock.CommonImmediatePostDominator(s.FalseBlock);
+                                await new CodeBlock("IF", s.TrueBlock, exit).Dump(writer);
+                                if (exit != s.FalseBlock)
+                                {
+                                    await writer.WriteLineAsync("ELSE");
+                                    await new CodeBlock("ELSE", s.FalseBlock, exit).Dump(writer);
+                                }
+
+                                next = exit;
+                                break;
+                            case Case s:
+                                await writer.WriteAsync("CASE ");
+                                await s.Expression.Dump(writer);
+                                await writer.WriteLineAsync(" OF");
+                                writer.Indent++;
+                                foreach (var (caseBlock, caseIndexes) in s.Cases)
+                                {
+                                    var indexes = string.Join(", ", caseIndexes);
+                                    await writer.WriteLineAsync(indexes + " :");
+                                    CodeBlock caseCodeBlock = new(indexes, caseBlock, s.Default);
+                                    await caseCodeBlock.Dump(writer);
+                                }
+                                writer.Indent--;
+                                await writer.WriteLineAsync("END {CASE}");
+                                next = s.Default;
+                                break;
+                            default:
+                                await statement.DumpLine(writer);
+                                break;
+                        }
+                    }
+                    currentBlock = next ?? currentBlock.EdgesOut.FirstOrDefault(e => !e.IsBack)?.Destination;
+
+                }
+                while (currentBlock != null && currentBlock != this.ExitBlock);
+
+                writer.Indent--;
+                if (emitBeginEnd)
+                    writer.WriteLine("END {" + this.Label + "}");
+            }
+            // if unk, is loop? has multi? next block?
+            // rep x
+            // while
+            // case x
         }
 
         private class DominatorData
@@ -491,7 +698,7 @@
                         var jump = (OpCode.Jump)opCode;
                         var jumpToBlock = this.AddressToBlock(jump.Address);
                         var nextBlock = this.OpIndexToBlock(index + 1);
-                        statements.Add(Expression.If( this.OpIndexToBlock(index), nextBlock,
+                        statements.Add(Expression.If(this.OpIndexToBlock(index), nextBlock,
                             jumpToBlock,
                             vmStack.Pop()));
                         break;
@@ -507,23 +714,23 @@
                         break;
                     }
                 case OpCodeValue.NFJ:
-                {
-                    var jump = (OpCode.Jump)opCode;
-                    var jumpToBlock = this.AddressToBlock(jump.Address);
-                    var nextBlock = this.OpIndexToBlock(index + 1);
-                    statements.Add(Expression.If(this.OpIndexToBlock(index), nextBlock,
-                        jumpToBlock,
-                        Expression.Compare(8, 0, vmStack.Pop(), vmStack.Pop())));
-                    break;
+                    {
+                        var jump = (OpCode.Jump)opCode;
+                        var jumpToBlock = this.AddressToBlock(jump.Address);
+                        var nextBlock = this.OpIndexToBlock(index + 1);
+                        statements.Add(Expression.If(this.OpIndexToBlock(index), nextBlock,
+                            jumpToBlock,
+                            Expression.Compare(8, 0, vmStack.Pop(), vmStack.Pop())));
+                        break;
                     }
                 case OpCodeValue.UJP:
                     break;
                 case OpCodeValue.XJP:
                     var xjp = (OpCode.JumpTable)opCode;
                     statements.Add(new Case(xjp.Minimum, this.AddressToBlock(xjp.DefaultAddress),
-                        from a in xjp.Addresses select this.AddressToBlock(a), vmStack.Pop()));
+                        (from a in xjp.Addresses select this.AddressToBlock(a)).ToArray(), vmStack.Pop()));
                     break;
-                
+
                 case OpCodeValue.CBP: // Call Base Procedure - call the main program
                 case OpCodeValue.CXP: // Call External Procedure - call a global procedure in another unit
                 case OpCodeValue.CGP: // Call Global Procedure - call a top level procedure in same unit
@@ -698,10 +905,10 @@
             var currentBlock = this.OpIndexToBlock(index);
             var jumpToBlock = this.AddressToBlock(jump.Address);
             var nextBlock = this.OpIndexToBlock(index + 1);
-            //if (currentBlock.Dominates.Count > 1)
-                statements.Add(Expression.If(currentBlock, nextBlock,
-                    jumpToBlock,
-                    test));
+            //if (startBlock.Dominates.Count > 1)
+            statements.Add(Expression.If(currentBlock, nextBlock,
+                jumpToBlock,
+                test));
             //else
             //{
             //    List<Expression> loopStatements = new(statements);
@@ -740,10 +947,17 @@
                 writer.Indent--;
             }
 
+
             if (this.BlockList.Count > 0)
-                await this.BlockList[0].Dump(writer);
-            else
-                await writer.WriteAsync(";");
+            {
+                CodeBlock codeBlock = new(this.Signature.Name, this.BlockList[0], CodeBlockType.Fixed);
+                await codeBlock.Dump(writer);
+            }
+
+            //if (this.BlockList.Count > 0)
+            //    await this.BlockList[0].Dump(writer);
+            //else
+            //    await writer.WriteAsync(";");
             await writer.WriteLineAsync();
         }
     }

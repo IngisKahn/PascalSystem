@@ -85,7 +85,7 @@
                         break;
                     }
                     if (visted.Contains(inBasicBlock))
-                        break;
+                        continue;
                     visted.Add(inBasicBlock);
                     pending.Enqueue(inBasicBlock);
                 }
@@ -111,7 +111,7 @@
         public class ControlEdge
         {
             public BasicBlock Source { get; set; }
-            public BasicBlock Destination { get; }
+            public BasicBlock Destination { get; set; }
             public bool IsBack { get; }
 
             public ControlEdge(BasicBlock source, BasicBlock destination, bool isBack)
@@ -120,6 +120,8 @@
                 this.Destination = destination;
                 this.IsBack = isBack;
             }
+
+            public bool IsConditional => this.Source.Statements.Last() is If;
         }
 
         public async Task Dump(IndentedTextWriter writer, bool indent = true)
@@ -141,7 +143,7 @@
             }
         }
         public override string ToString() => $"BB{this.Id}: Size:{this.Length} "
-                                             + $"In:[{string.Join(", ", this.EdgesIn.Select(ce => ce.Source.Id.ToString(CultureInfo.InvariantCulture)))}] "
-                                             + $"Out:[{string.Join(", ", this.EdgesOut.Select(ce => ce.Destination.Id.ToString(CultureInfo.InvariantCulture)))}]";
+                                             + $"In:[{string.Join(", ", this.EdgesIn.Select(ce => ce.Source.Id.ToString(CultureInfo.InvariantCulture)))}] IDom:{this.ImmediateDominator?.Id} "
+                                             + $"Out:[{string.Join(", ", this.EdgesOut.Select(ce => ce.Destination.Id.ToString(CultureInfo.InvariantCulture)))}] PIDom:{this.ImmediatePostDominator?.Id}";
     }
 }

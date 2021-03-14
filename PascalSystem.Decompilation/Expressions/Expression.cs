@@ -12,6 +12,12 @@
         {
             StringBuilder stringBuilder = new();
             this.BuildString(stringBuilder);
+            return writer.WriteAsync(stringBuilder);
+        }
+        internal virtual Task DumpLine(IndentedTextWriter writer)
+        {
+            StringBuilder stringBuilder = new();
+            this.BuildString(stringBuilder);
             return writer.WriteLineAsync(stringBuilder + ";");
         }
 
